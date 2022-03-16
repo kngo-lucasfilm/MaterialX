@@ -13,8 +13,7 @@
 
 #include <iostream>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 const float PI = std::acos(-1.0f);
 
@@ -35,18 +34,18 @@ GlslRendererPtr GlslRenderer::create(unsigned int width, unsigned int height, Im
 GlslRenderer::GlslRenderer(unsigned int width, unsigned int height, Image::BaseType baseType) :
     ShaderRenderer(width, height, baseType),
     _initialized(false),
-    _eye(0.0f, 0.0f, 4.0f),
+    _eye(0.0f, 0.0f, 3.0f),
     _center(0.0f, 0.0f, 0.0f),
     _up(0.0f, 1.0f, 0.0f),
     _objectScale(1.0f),
-    _clearColor(0.4f, 0.4f, 0.4f, 1.0f)
+    _clearColor(0.3f, 0.3f, 0.32f, 1.0f)
 {
     _program = GlslProgram::create();
 
     _geometryHandler = GeometryHandler::create();
     _geometryHandler->addLoader(TinyObjLoader::create());
 
-    _viewHandler = ViewHandler::create();
+    _camera = Camera::create();
 }
 
 void GlslRenderer::initialize()
@@ -157,26 +156,13 @@ void GlslRenderer::updateViewInformation()
     float fH = std::tan(FOV_PERSP / 360.0f * PI) * NEAR_PLANE_PERSP;
     float fW = fH * 1.0f;
 
-    _viewHandler->viewMatrix = ViewHandler::createViewMatrix(_eye, _center, _up);
-    _viewHandler->projectionMatrix = ViewHandler::createPerspectiveMatrix(-fW, fW, -fH, fH, NEAR_PLANE_PERSP, FAR_PLANE_PERSP);
-
-    Matrix44 invView = _viewHandler->viewMatrix.getInverse();
-    _viewHandler->viewDirection = { invView[2][0], invView[2][1], invView[2][2] };
-    _viewHandler->viewPosition = { invView[3][0], invView[3][1], invView[3][2] };
+    _camera->setViewMatrix(Camera::createViewMatrix(_eye, _center, _up));
+    _camera->setProjectionMatrix(Camera::createPerspectiveMatrix(-fW, fW, -fH, fH, NEAR_PLANE_PERSP, FAR_PLANE_PERSP));
 }
 
 void GlslRenderer::updateWorldInformation()
 {
-    float aspectRatio = float(_width) / float(_height);
-    float geometryRatio = _height < _width ?  aspectRatio : (1.0f / aspectRatio);
-    Vector3 boxMin = _geometryHandler->getMinimumBounds();
-    Vector3 boxMax = _geometryHandler->getMaximumBounds();
-    Vector3 sphereCenter = (boxMax + boxMin) / 2.0;
-    float sphereRadius = (sphereCenter - boxMin).getMagnitude() * geometryRatio;
-    float meshFit = 2.0f / sphereRadius;
-    Vector3 modelTranslation = sphereCenter * -1.0f;
-    _viewHandler->worldMatrix = Matrix44::createTranslation(modelTranslation) *
-                                Matrix44::createScale(Vector3(_objectScale * meshFit));
+     _camera->setWorldMatrix(Matrix44::createScale(Vector3(_objectScale)));
 }
 
 void GlslRenderer::render()
@@ -212,16 +198,40 @@ void GlslRenderer::render()
             }
             else
             {
-                // Bind the program to use
-                _program->bind();
-                _program->bindInputs(_viewHandler, _geometryHandler, _imageHandler, _lightHandler);
-
-                // Draw all the partitions of all the meshes in the handler
-                for (const auto& mesh : _geometryHandler->getMeshes())
+                // Bind the shader program.
+                if (!_program->bind())
                 {
+                    throw ExceptionRenderError("Cannot bind inputs without a valid program");
+                }
+
+                // Update uniforms and attributes.
+                _program->getUniformsList();
+                _program->getAttributesList();
+
+                // Bind shader properties.
+                _program->bindViewInformation(_camera);
+                _program->bindTextures(_imageHandler);
+                _program->bindLighting(_lightHandler, _imageHandler);
+                _program->bindTimeAndFrame();
+
+                // Set blend state for the given material.
+                if (_program->getShader()->hasAttribute(HW::ATTR_TRANSPARENT))
+                {
+                    glEnable(GL_BLEND);
+                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                }
+                else
+                {
+                    glDisable(GL_BLEND);
+                }
+
+                // Bind each mesh and draw its partitions.
+                for (MeshPtr mesh : _geometryHandler->getMeshes())
+                {
+                    _program->bindMesh(mesh);
                     for (size_t i = 0; i < mesh->getPartitionCount(); i++)
                     {
-                        auto part = mesh->getPartition(i);
+                        MeshPartitionPtr part = mesh->getPartition(i);
                         _program->bindPartition(part);
                         MeshIndexBuffer& indexData = part->getIndices();
                         glDrawElements(GL_TRIANGLES, (GLsizei)indexData.size(), GL_UNSIGNED_INT, (void*)0);
@@ -229,8 +239,14 @@ void GlslRenderer::render()
                 }
 
                 // Unbind resources
+                _imageHandler->unbindImages();
                 _program->unbind();
-                _program->unbindInputs(_imageHandler);
+
+                // Restore blend state.
+                if (_program->getShader()->hasAttribute(HW::ATTR_TRANSPARENT))
+                {
+                    glDisable(GL_BLEND);
+                }
             }
         }
     }
@@ -313,4 +329,4 @@ void GlslRenderer::setClearColor(const Color4& clearColor)
     _clearColor = clearColor;
 }
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END

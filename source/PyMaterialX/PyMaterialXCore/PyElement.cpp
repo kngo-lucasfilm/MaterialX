@@ -35,6 +35,7 @@ void bindPyElement(py::module& mod)
         .def("getName", &mx::Element::getName)
         .def("getNamePath", &mx::Element::getNamePath,
             py::arg("relativeTo") = nullptr)
+        .def("getDescendant", &mx::Element::getDescendant)
         .def("setFilePrefix", &mx::Element::setFilePrefix)
         .def("hasFilePrefix", &mx::Element::hasFilePrefix)
         .def("getFilePrefix", &mx::Element::getFilePrefix)
@@ -85,7 +86,6 @@ void bindPyElement(py::module& mod)
         .def("getUpstreamElement", &mx::Element::getUpstreamElement,
             py::arg("index") = 0)
         .def("traverseInheritance", &mx::Element::traverseInheritance)
-        .def("getTreeIndex", &mx::Element::getTreeIndex)
         .def("setSourceUri", &mx::Element::setSourceUri)
         .def("hasSourceUri", &mx::Element::hasSourceUri)
         .def("getSourceUri", &mx::Element::getSourceUri)
@@ -127,7 +127,7 @@ void bindPyElement(py::module& mod)
         .def("isMultiOutputType", &mx::TypedElement::isMultiOutputType)
         .def("getTypeDef", &mx::TypedElement::getTypeDef)
         .def_readonly_static("TYPE_ATTRIBUTE", &mx::TypedElement::TYPE_ATTRIBUTE);
-        
+
     py::class_<mx::ValueElement, mx::ValueElementPtr, mx::TypedElement>(mod, "ValueElement")
         .def("setValueString", &mx::ValueElement::setValueString)
         .def("hasValueString", &mx::ValueElement::hasValueString)

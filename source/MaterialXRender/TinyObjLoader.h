@@ -11,8 +11,7 @@
 
 #include <MaterialXRender/GeometryHandler.h>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 /// Shared pointer to a TinyObjLoader
 using TinyObjLoaderPtr = std::shared_ptr<class TinyObjLoader>;
@@ -32,9 +31,9 @@ class MX_RENDER_API TinyObjLoader : public GeometryLoader
     static TinyObjLoaderPtr create() { return std::make_shared<TinyObjLoader>(); }
 
     /// Load geometry from disk
-    bool load(const FilePath& filePath, MeshList& meshList) override;
+    bool load(const FilePath& filePath, MeshList& meshList, bool texcoordVerticalFlip = false) override;
 };
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END
 
 #endif

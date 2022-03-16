@@ -20,8 +20,7 @@
 
 #include <MaterialXGenGlsl/GlslShaderGenerator.h>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 /// A shared pointer to a TextureBaker
 using TextureBakerPtr = shared_ptr<class TextureBaker>;
@@ -143,6 +142,28 @@ class MX_RENDERGLSL_API TextureBaker : public GlslRenderer
         return _bakedGeomInfoName;
     }
 
+    /// Get the texture filename template.
+    const string& getTextureFilenameTemplate() const
+    {
+        return _textureFilenameTemplate;
+    }
+
+    /// Set the texture filename template.
+    void setTextureFilenameTemplate(const string& filenameTemplate)
+    {
+        _textureFilenameTemplate = (filenameTemplate.find("$EXTENSION") == string::npos) ?
+            filenameTemplate + ".$EXTENSION" : filenameTemplate;
+    }
+
+    /// Set texFilenameOverrides if template variable exists.
+    void setFilenameTemplateVarOverride(const string& key, const string& value)
+    {
+        if (_permittedOverrides.count(key))
+        {
+            _texTemplateOverrides[key] = value;
+        }
+    }
+
     /// Set the output stream for reporting progress and warnings.  Defaults to std::cout.
     void setOutputStream(std::ostream* outputStream)
     {
@@ -176,18 +197,16 @@ class MX_RENDERGLSL_API TextureBaker : public GlslRenderer
     void bakeShaderInputs(NodePtr material, NodePtr shader, GenContext& context, const string& udim = EMPTY_STRING);
 
     /// Bake a texture for the given graph output.
-    void bakeGraphOutput(OutputPtr output, GenContext& context, const FilePath& filename);
+    void bakeGraphOutput(OutputPtr output, GenContext& context, const StringMap& filenameTemplateMap);
 
     /// Optimize baked textures before writing.
     void optimizeBakedTextures(NodePtr shader);
 
-    /// Write the baked material with textures to a document.
-    DocumentPtr bakeMaterial(NodePtr shader, const StringVec& udimSet);
+    /// Bake material to document in memory and write baked textures to disk.
+    DocumentPtr bakeMaterialToDoc(DocumentPtr doc, const FileSearchPath& searchPath, const string& materialPath, 
+                                  const StringVec udimSet, std::string& documentName);
 
-    /// Bake all materials in the given document and return them as a vector.
-    BakedDocumentVec createBakeDocuments(DocumentPtr doc, const FileSearchPath& searchPath);
-
-    /// Bake all materials in the given document and write them to disk.  If multiple documents are written,
+    /// Bake materials in the given document and write them to disk.  If multiple documents are written,
     /// then the given output filename will be used as a template.
     void bakeAllMaterials(DocumentPtr doc, const FileSearchPath& searchPath, const FilePath& outputFileName);
 
@@ -212,8 +231,17 @@ class MX_RENDERGLSL_API TextureBaker : public GlslRenderer
   protected:
     TextureBaker(unsigned int width, unsigned int height, Image::BaseType baseType);
 
+    // Populate file template variable naming map
+    StringMap initializeFileTemplateMap(InputPtr input, NodePtr shader, const string& udim = EMPTY_STRING);
+
+    // Find first occurence of variable in filename from start index onwards
+    size_t findVarInTemplate(const string& filename, const string& var, size_t start = 0);
+
     // Generate a texture filename for the given graph output.
-    FilePath generateTextureFilename(OutputPtr output, const string& srName, const string& udim);
+    FilePath generateTextureFilename(const StringMap& fileTemplateMap);
+
+    // Create document that links shader outputs to a material.
+    DocumentPtr generateNewDocumentFromShader(NodePtr shader, const StringVec& udimSet);
 
     // Write a baked image to disk, returning true if the write was successful.
     bool writeBakedImage(const BakedImage& baked, ImagePtr image);
@@ -227,6 +255,7 @@ class MX_RENDERGLSL_API TextureBaker : public GlslRenderer
     FilePath _outputImagePath;
     string _bakedGraphName;
     string _bakedGeomInfoName;
+    string _textureFilenameTemplate;
     std::ostream* _outputStream;
     bool _hashImageNames;
 
@@ -235,10 +264,13 @@ class MX_RENDERGLSL_API TextureBaker : public GlslRenderer
     ImagePtr _frameCaptureImage;
     BakedImageMap _bakedImageMap;
     BakedConstantMap _bakedConstantMap;
+    StringSet _permittedOverrides;
+    StringMap _texTemplateOverrides;
+    StringMap _bakedInputMap;
 
     std::unordered_map<string, NodePtr> _worldSpaceNodes;
 };
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END
 
 #endif

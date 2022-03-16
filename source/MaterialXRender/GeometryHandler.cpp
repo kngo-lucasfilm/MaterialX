@@ -10,8 +10,7 @@
 
 #include <limits>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 void GeometryHandler::addLoader(GeometryLoaderPtr loader)
 {
@@ -80,7 +79,7 @@ void GeometryHandler::computeBounds()
     }
 }
 
-bool GeometryHandler::loadGeometry(const FilePath& filePath)
+bool GeometryHandler::loadGeometry(const FilePath& filePath, bool texcoordVerticalFlip)
 {
     // Early return if already loaded
     if (hasGeometry(filePath))
@@ -97,7 +96,7 @@ bool GeometryHandler::loadGeometry(const FilePath& filePath)
     GeometryLoaderMap::iterator last = --range.first;
     for (auto it = first; it != last; --it)
     {
-        loaded = it->second->load(filePath, _meshes);
+        loaded = it->second->load(filePath, _meshes, texcoordVerticalFlip);
         if (loaded)
         {
             break;
@@ -111,6 +110,22 @@ bool GeometryHandler::loadGeometry(const FilePath& filePath)
     }
 
     return loaded;
+}
+
+MeshPtr GeometryHandler::findParentMesh(MeshPartitionPtr part)
+{
+    for (MeshPtr mesh : getMeshes())
+    {
+        for (size_t i = 0; i < mesh->getPartitionCount(); i++)
+        {
+            if (mesh->getPartition(i) == part)
+            {
+                return mesh;
+            }
+        }
+    }
+
+    return nullptr;
 }
 
 MeshPtr GeometryHandler::createQuadMesh()
@@ -138,4 +153,4 @@ MeshPtr GeometryHandler::createQuadMesh()
     return quadMesh;
 }
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END

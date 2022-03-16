@@ -5,18 +5,15 @@
 
 #include <MaterialXRenderOsl/OslRenderer.h>
 
-#include <MaterialXFormat/File.h>
-
-#include <MaterialXFormat/Util.h>
-
 #include <MaterialXGenOsl/OslShaderGenerator.h>
+
+#include <MaterialXFormat/File.h>
+#include <MaterialXFormat/Util.h>
 
 #include <fstream>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
-// Statics
 string OslRenderer::OSL_CLOSURE_COLOR_STRING("closure color");
 
 //
@@ -30,7 +27,9 @@ OslRendererPtr OslRenderer::create(unsigned int width, unsigned int height, Imag
 
 OslRenderer::OslRenderer(unsigned int width, unsigned int height, Image::BaseType baseType) :
     ShaderRenderer(width, height, baseType),
-    _useTestRender(true) // By default use testrender
+    _useTestRender(true),
+    _raysPerPixelLit(1),
+    _raysPerPixelUnlit(1)
 {
 }
 
@@ -87,7 +86,6 @@ void OslRenderer::renderOSL(const FilePath& dirPath, const string& shaderName, c
 
     // Set output image name.
     string outputFileName = shaderPath + "_osl.png";
-    // Cache the output file name
     _oslOutputFileName = outputFileName;
 
     // Use a known error file name to check
@@ -96,11 +94,10 @@ void OslRenderer::renderOSL(const FilePath& dirPath, const string& shaderName, c
 
     // Read in scene template and replace the applicable tokens to have a valid ShaderGroup.
     // Write to local file to use as input for rendering.
-    //
     std::ifstream sceneTemplateStream(_oslTestRenderSceneTemplateFile);
     string sceneTemplateString;
     sceneTemplateString.assign(std::istreambuf_iterator<char>(sceneTemplateStream),
-        std::istreambuf_iterator<char>());
+                               std::istreambuf_iterator<char>());
 
     // Get final output to use in the shader
     const string CLOSURE_PASSTHROUGH_SHADER_STRING("closure_passthrough");
@@ -118,7 +115,7 @@ void OslRenderer::renderOSL(const FilePath& dirPath, const string& shaderName, c
     const string INPUT_SHADER_PARAMETER_OVERRIDES("%input_shader_parameter_overrides%");
     const string INPUT_SHADER_OUTPUT_STRING("%input_shader_output%");
     const string BACKGROUND_COLOR_STRING("%background_color%");
-    const string backgroundColor("0.4 0.4 0.4"); // TODO: Make this a user input
+    const string backgroundColor("0.3 0.3 0.32"); // TODO: Make this a user input
 
     StringMap replacementMap;
     replacementMap[OUTPUT_SHADER_TYPE_STRING] = outputShader;
@@ -142,7 +139,7 @@ void OslRenderer::renderOSL(const FilePath& dirPath, const string& shaderName, c
     if ((sceneString == sceneTemplateString) || sceneTemplateString.empty())
     {
         throw ExceptionRenderError("Scene template file: " + _oslTestRenderSceneTemplateFile.asString() +
-                                         " does not include proper tokens for rendering");
+                                   " does not include proper tokens for rendering");
     }
 
     // Write scene file
@@ -160,46 +157,49 @@ void OslRenderer::renderOSL(const FilePath& dirPath, const string& shaderName, c
     osoPaths += PATH_LIST_SEPARATOR + dirPath.asString();
 
     // Build and run render command
-    //
     string command(_oslTestRenderExecutable);
     command += " " + sceneFileName;
     command += " " + outputFileName;
-    command += " -r " + std::to_string(_width) + " " + std::to_string(_height) + " --path " + osoPaths;
-    if (isColorClosure)
-    {
-        command += " -aa 4 "; // Images are very noisy without anti-aliasing
-    }
+    command += " -r " + std::to_string(_width) + " " + std::to_string(_height);
+    command += " --path " + osoPaths;
+    command += " -aa " + std::to_string(isColorClosure ? _raysPerPixelLit : _raysPerPixelUnlit);
     command += " > " + errorFile + redirectString;
 
-    int returnValue = std::system(command.c_str());
-
-    std::ifstream errorStream(errorFile);
-    StringVec result;
-    string line;
-    const string pngWarning("libpng warning: iCCP: known incorrect sRGB profile");
-    unsigned int errCount = 0;
-    while (std::getline(errorStream, line))
+    // Repeat the render command to allow for sporadic errors.
+    int returnValue = 0;
+    for (int i = 0; i < 5; i++)
     {
-        if (line.find(pngWarning) != std::string::npos)
-        {
-            continue;
-        }
-        if (errCount++ > 10)
+        returnValue = std::system(command.c_str());
+        if (!returnValue)
         {
             break;
         }
-        result.push_back(line);
     }
-    if (!result.empty())
+
+    // Report errors on a non-zero return value.
+    if (returnValue)
     {
+        std::ifstream errorStream(errorFile);
+        StringVec result;
+        string line;
+        unsigned int errCount = 0;
+        while (std::getline(errorStream, line))
+        {
+            if (errCount++ > 10)
+            {
+                break;
+            }
+            result.push_back(line);
+        }
+
         StringVec errors;
-        errors.push_back("Command string: " + command);
-        errors.push_back("Command return code: " + std::to_string(returnValue));
-        errors.push_back("Shader failed to render:");
+        errors.push_back("Errors reported in renderOSL:");
         for (size_t i = 0; i < result.size(); i++)
         {
             errors.push_back(result[i]);
         }
+        errors.push_back("Command string: " + command);
+        errors.push_back("Command return code: " + std::to_string(returnValue));
         throw ExceptionRenderError("OSL rendering error", errors);
     }
 }
@@ -218,7 +218,6 @@ void OslRenderer::shadeOSL(const FilePath& dirPath, const string& shaderName, co
 
     // Set output image name.
     string outputFileName = shaderPath + ".testshade.png";
-    // Cache the output file name
     _oslOutputFileName = outputFileName;
 
     // Use a known error file name to check
@@ -256,13 +255,13 @@ void OslRenderer::shadeOSL(const FilePath& dirPath, const string& shaderName, co
     if (!results.empty())
     {
         StringVec errors;
-        errors.push_back("Command string: " + command);
-        errors.push_back("Command return code: " + std::to_string(returnValue));
-        errors.push_back("Shader failed to render:");
+        errors.push_back("Errors reported in shadeOSL:");
         for (const auto& resultLine : results)
         {
             errors.push_back(resultLine);
         }
+        errors.push_back("Command string: " + command);
+        errors.push_back("Command return code: " + std::to_string(returnValue));
         throw ExceptionRenderError("OSL rendering error", errors);
     }
 }
@@ -284,8 +283,12 @@ void OslRenderer::compileOSL(const FilePath& oslFilePath)
     const string redirectString(" 2>&1");
 
     // Run the command and get back the result. If non-empty string throw exception with error
-    string command = _oslCompilerExecutable.asString() + " -q -I\"" + _oslIncludePath.asString() + "\" " +
-                     oslFilePath.asString() + " -o " + outputFileName.asString() + " > " + errorFile + redirectString;
+    string command = _oslCompilerExecutable.asString() + " -q ";
+    for (FilePath p : _oslIncludePath)
+    { 
+        command += " -I\"" + p.asString() + "\" ";
+    }
+    command += oslFilePath.asString() + " -o " + outputFileName.asString() + " > " + errorFile + redirectString;
 
     int returnValue = std::system(command.c_str());
 
@@ -406,4 +409,4 @@ ImagePtr OslRenderer::captureImage(ImagePtr)
     return returnImage;
 }
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END

@@ -18,8 +18,7 @@
 
 #include <MaterialXCore/Document.h>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 class ShaderGenerator;
 
@@ -79,8 +78,8 @@ class MX_GENSHADER_API UnitSystem
     ShaderNodePtr createNode(ShaderGraph* parent, const UnitTransform& transform, const string& name,
                              GenContext& context) const;
 
-    /// Returns an implementation name for a given transform
-    virtual string getImplementationName(const UnitTransform& transform, const string& unitname) const;
+    /// Returns an implementation for a given transform
+    virtual ImplementationPtr getImplementation(const UnitTransform& transform, const string& unitname) const;
 
     static const string UNITSYTEM_NAME;
 
@@ -94,6 +93,6 @@ class MX_GENSHADER_API UnitSystem
     string _target;
 };
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END
 
 #endif

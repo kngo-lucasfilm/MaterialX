@@ -11,8 +11,7 @@
 
 #include <MaterialXCore/Export.h>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 extern MX_CORE_API const string EMPTY_STRING;
 
@@ -49,10 +48,10 @@ MX_CORE_API bool stringEndsWith(const string& str, const string& suffix);
 MX_CORE_API string trimSpaces(const string& str);
 
 /// Combine the hash of a value with an existing seed.
-template<typename T> void hashCombine(size_t& seed, const T& value)
+template <typename T> void hashCombine(size_t& seed, const T& value)
 {
     seed ^= std::hash<T>()(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-} 
+}
 
 /// Split a name path into string vector
 MX_CORE_API StringVec splitNamePath(const string& namePath);
@@ -63,6 +62,6 @@ MX_CORE_API string createNamePath(const StringVec& nameVec);
 /// Given a name path, return the parent name path
 MX_CORE_API string parentNamePath(const string& namePath);
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END
 
 #endif

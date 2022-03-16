@@ -11,8 +11,7 @@
 
 #include <iterator>
 
-namespace MaterialX
-{
+MATERIALX_NAMESPACE_BEGIN
 
 const string Element::NAME_ATTRIBUTE = "name";
 const string Element::FILE_PREFIX_ATTRIBUTE = "fileprefix";
@@ -214,12 +213,12 @@ void Element::removeAttribute(const string& attrib)
     }
 }
 
-template<class T> shared_ptr<T> Element::asA()
+template <class T> shared_ptr<T> Element::asA()
 {
     return std::dynamic_pointer_cast<T>(getSelf());
 }
 
-template<class T> shared_ptr<const T> Element::asA() const
+template <class T> shared_ptr<const T> Element::asA() const
 {
     return std::dynamic_pointer_cast<const T>(getSelf());
 }
@@ -435,7 +434,10 @@ StringResolverPtr Element::createStringResolver(const string& geom) const
             }
         }
     }
-
+    
+    // Add in token substitutions
+    resolver->addTokenSubstitutions(getSelf());
+  
     return resolver;
 }
 
@@ -538,6 +540,32 @@ bool ValueElement::validate(string* message) const
     {
         validateRequire(getValue() != nullptr, res, message, "Invalid value");
     }
+
+    if (hasInterfaceName())
+    {
+        validateRequire(isA<Input>() || isA<Token>(), res, message, "Only input and token elements support interface names");
+        ConstNodeGraphPtr nodeGraph = getAncestorOfType<NodeGraph>();
+        NodeDefPtr nodeDef = nodeGraph ? nodeGraph->getNodeDef() : nullptr;
+        if (nodeDef)
+        {
+            ValueElementPtr valueElem = nodeDef->getActiveValueElement(getInterfaceName());
+            validateRequire(valueElem != nullptr, res, message, "Interface name not found in referenced NodeDef");
+            if (valueElem)
+            {
+                ConstPortElementPtr portElem = asA<PortElement>();
+                if (portElem && portElem->hasChannels())
+                {
+                    bool valid = portElem->validChannelsString(portElem->getChannels(), valueElem->getType(), getType());
+                    validateRequire(valid, res, message, "Invalid channels string for interface name");
+                }
+                else
+                {
+                    validateRequire(getType() == valueElem->getType(), res, message, "Interface name refers to value element of a different type");
+                }
+            }
+        }
+    }
+
     UnitTypeDefPtr unitTypeDef;
     if (hasUnitType())
     {
@@ -547,7 +575,7 @@ bool ValueElement::validate(string* message) const
             unitTypeDef = getDocument()->getUnitTypeDef(unittype);
             validateRequire(unitTypeDef != nullptr, res, message, "Unit type definition does not exist in document");
         }
-    }            
+    }
     if (hasUnit())
     {
         bool foundUnit = false;
@@ -581,7 +609,35 @@ void StringResolver::setUvTileString(const string& uvTile)
 {
     setFilenameSubstitution(UV_TILE_TOKEN, uvTile);
 }
-    
+
+void StringResolver::addTokenSubstitutions(ConstElementPtr element)
+{
+    const string DELIMITER_PREFIX = "[";
+    const string DELIMITER_POSTFIX = "]";
+
+    // Travese from sibliings up until root is reached.
+    // Child tokens override any parent tokens.
+    ConstElementPtr parent = element->getParent();
+    while (parent)
+    {
+        ConstInterfaceElementPtr interfaceElem = parent->asA<InterfaceElement>();
+        if (interfaceElem)
+        {       
+            vector<TokenPtr> tokens = interfaceElem->getActiveTokens();
+            for (auto token : tokens)
+            {
+                string key = DELIMITER_PREFIX + token->getName() + DELIMITER_POSTFIX;
+                string value = token->getResolvedValueString();
+                if (!_filenameMap.count(key))
+                { 
+                    setFilenameSubstitution(key, value);
+                }
+            }
+        }
+        parent = parent->getParent();
+    }
+}
+
 string StringResolver::resolve(const string& str, const string& type) const
 {
     if (type == FILENAME_TYPE_STRING)
@@ -610,7 +666,7 @@ bool targetStringsMatch(const string& target1, const string& target2)
     StringSet set2(vec2.begin(), vec2.end());
 
     StringSet matches;
-    std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(), 
+    std::set_intersection(set1.begin(), set1.end(), set2.begin(), set2.end(),
                           std::inserter(matches, matches.end()));
     return !matches.empty();
 }
@@ -644,9 +700,9 @@ template <class T> class ElementRegistry
 // Template instantiations
 //
 
-#define INSTANTIATE_SUBCLASS(T)                                     \
-template MX_CORE_API shared_ptr<T> Element::asA<T>();               \
-template MX_CORE_API shared_ptr<const T> Element::asA<T>() const;
+#define INSTANTIATE_SUBCLASS(T)                           \
+    template MX_CORE_API shared_ptr<T> Element::asA<T>(); \
+    template MX_CORE_API shared_ptr<const T> Element::asA<T>() const;
 
 INSTANTIATE_SUBCLASS(Element)
 INSTANTIATE_SUBCLASS(GeomElement)
@@ -656,10 +712,10 @@ INSTANTIATE_SUBCLASS(PortElement)
 INSTANTIATE_SUBCLASS(TypedElement)
 INSTANTIATE_SUBCLASS(ValueElement)
 
-#define INSTANTIATE_CONCRETE_SUBCLASS(T, category)      \
-const string T::CATEGORY(category);                     \
-ElementRegistry<T> registry##T;                         \
-INSTANTIATE_SUBCLASS(T)
+#define INSTANTIATE_CONCRETE_SUBCLASS(T, category) \
+    const string T::CATEGORY(category);            \
+    ElementRegistry<T> registry##T;                \
+    INSTANTIATE_SUBCLASS(T)
 
 INSTANTIATE_CONCRETE_SUBCLASS(AttributeDef, "attributedef")
 INSTANTIATE_CONCRETE_SUBCLASS(Backdrop, "backdrop")
@@ -695,4 +751,4 @@ INSTANTIATE_CONCRETE_SUBCLASS(VariantAssign, "variantassign")
 INSTANTIATE_CONCRETE_SUBCLASS(VariantSet, "variantset")
 INSTANTIATE_CONCRETE_SUBCLASS(Visibility, "visibility")
 
-} // namespace MaterialX
+MATERIALX_NAMESPACE_END

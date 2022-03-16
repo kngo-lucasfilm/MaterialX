@@ -12,8 +12,6 @@
 #include <MaterialXFormat/XmlIo.h>
 #include <MaterialXFormat/Util.h>
 
-#include <iostream>
-
 namespace mx = MaterialX;
 
 bool isTopologicalOrder(const std::vector<mx::ElementPtr>& elems)
@@ -138,6 +136,21 @@ TEST_CASE("Node", "[node]")
     REQUIRE(doc->getOutputs().empty());
 }
 
+TEST_CASE("Inheritance", "[nodedef]")
+{
+    mx::DocumentPtr doc = mx::createDocument();
+    const mx::FilePathVec libraryFolders;
+    mx::FileSearchPath libraryRoot(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
+    mx::loadLibraries(libraryFolders, libraryRoot, doc);
+    REQUIRE(doc->validate());
+    auto nodedef = doc->getNodeDef("ND_standard_surface_surfaceshader");
+    REQUIRE(nodedef);
+    mx::NodePtr surfaceNode = doc->addNodeInstance(nodedef);
+    REQUIRE(surfaceNode);
+    mx::InputPtr specularInput = surfaceNode->addInputFromNodeDef("specular");
+    REQUIRE(specularInput);
+}
+
 TEST_CASE("Flatten", "[nodegraph]")
 {
     mx::FileSearchPath searchPath = "resources/Materials/Examples/Syntax" +
@@ -207,6 +220,36 @@ TEST_CASE("Flatten", "[nodegraph]")
         }
     }
     REQUIRE(totalNodeCount == 16);
+
+    // Read the example with upstream nodegraphs
+    doc = mx::createDocument();
+    const mx::FilePathVec libraryFolders;
+    mx::FileSearchPath libraryRoot(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
+    mx::loadLibraries(libraryFolders, libraryRoot, doc);
+    searchPath = mx::FileSearchPath("resources/Materials/TestSuite/stdlib/definition/");
+    mx::readFromXmlFile(doc, "definition_using_definitions.mtlx", searchPath);
+    REQUIRE(doc->validate());
+
+    doc->flattenSubgraphs(mx::EMPTY_STRING,
+        [](mx::NodePtr node)
+    {
+        // Skip standard surface
+        return (node->getCategory() != "standard_surface");
+    });
+
+    mx::NodeGraphPtr upstreamGraph = doc->getNodeGraph("layered_inputGraph");
+    if (upstreamGraph)
+    {
+        upstreamGraph->flattenSubgraphs();
+    }
+    mx::XmlWriteOptions writeOptions;
+    auto skipDefinition = [](mx::ConstElementPtr elem)
+    {
+        return !elem->isA<mx::NodeDef>() && elem->getAttribute("nodedef").empty();
+    };
+    writeOptions.elementPredicate = skipDefinition;
+    mx::writeToXmlFile(doc, "PostFlattenedGraph.mtlx", &writeOptions);
+    REQUIRE(doc->validate());
 }
 
 TEST_CASE("Topological sort", "[nodegraph]")
@@ -572,6 +615,56 @@ TEST_CASE("Organization", "[nodegraph]")
     nodeGraph->removeBackdrop(backdrop1->getName());
     nodeGraph->removeBackdrop(backdrop2->getName());
     CHECK(nodeGraph->getBackdrops().empty());
+}
+
+TEST_CASE("Tokens", "[nodegraph]")
+{
+    mx::DocumentPtr doc = mx::createDocument();
+    mx::loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/stdlib/stdlib_defs.mtlx"), doc);
+    mx::loadLibrary(mx::FilePath::getCurrentPath() / mx::FilePath("libraries/stdlib/stdlib_ng.mtlx"), doc);
+    mx::FileSearchPath searchPath("resources/Materials/TestSuite/stdlib/texture/");
+
+    mx::readFromXmlFile(doc, "tokenGraph.mtlx", searchPath);
+    doc->validate();
+
+    mx::StringVec graphNames = { "Tokenized_Image_2k_png", "Tokenized_Image_4k_jpg" };
+    mx::StringVec resolutionStrings = { "2k", "4k" };
+    mx::StringVec extensionStrings = { "png", "jpg" };
+    for (size_t i=0; i<graphNames.size(); i++)
+    {
+        mx::NodeGraphPtr graph = doc->getNodeGraph(graphNames[i]);
+        REQUIRE(graph);
+        std::vector<mx::TokenPtr> tokens = graph->getActiveTokens();
+
+        mx::NodePtr imagePtr = graph->getNode("tiledimage");
+        REQUIRE(imagePtr);
+
+        mx::InputPtr input = imagePtr->getInput("file");
+        REQUIRE(input);
+
+        // Test file name substitution creation.
+        mx::StringResolverPtr resolver = input->createStringResolver();
+        const mx::StringMap& substitutions = resolver->getFilenameSubstitutions();
+        const std::string DELIMITER_PREFIX("[");
+        const std::string DELIMITER_POSTFIX("]");
+        for (auto token : tokens)
+        {
+            const std::string tokenString = DELIMITER_PREFIX + token->getName() + DELIMITER_POSTFIX;
+            REQUIRE(substitutions.count(tokenString));
+        }
+
+        // Test that one of the tokens was used
+        REQUIRE(input->getValueString() == std::string("resources/images/cloth.[Image_Extension]"));
+        REQUIRE(input->getResolvedValueString() == std::string("resources/images/cloth." + extensionStrings[i]));
+
+        // Modify and test that both of the tokens was used
+        input->setValueString("resources/images/cloth_[Image_Resolution].[Image_Extension]");
+        REQUIRE(input->getResolvedValueString() == std::string("resources/images/cloth_" + resolutionStrings[i] + "." + extensionStrings[i]));
+
+        // Modify and test without proper delimiters
+        input->setValueString("resources/images/cloth_<Image_Resolution>.<Image_Extension>");
+        REQUIRE(input->getResolvedValueString() == std::string("resources/images/cloth_<Image_Resolution>.<Image_Extension>"));
+    }
 }
 
 TEST_CASE("Node Definition Creation", "[nodedef]")

@@ -7,6 +7,7 @@
 
 #include <MaterialXFormat/Environ.h>
 #include <MaterialXFormat/File.h>
+#include <MaterialXFormat/Util.h>
 #include <MaterialXFormat/XmlIo.h>
 
 namespace mx = MaterialX;
@@ -170,7 +171,7 @@ TEST_CASE("Load content", "[xmlio]")
 
     // Reconstruct and verify that the document contains no images.
     mx::DocumentPtr writtenDoc = mx::createDocument();
-    mx::readFromXmlString(writtenDoc, xmlString, &readOptions);
+    mx::readFromXmlString(writtenDoc, xmlString, mx::FileSearchPath(), &readOptions);
     REQUIRE(*writtenDoc != *doc);
     unsigned imageElementCount = 0;
     for (mx::ElementPtr elem : writtenDoc->traverseTree())
@@ -203,7 +204,7 @@ TEST_CASE("Load content", "[xmlio]")
 
     // Verify that the document contains no XIncludes.
     writtenDoc = mx::createDocument();
-    mx::readFromXmlString(writtenDoc, xmlString, &readOptions);
+    mx::readFromXmlString(writtenDoc, xmlString, mx::FileSearchPath(), &readOptions);
     bool hasSourceUri = false;
     for (mx::ElementPtr elem : writtenDoc->traverseTree())
     {

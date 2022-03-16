@@ -102,11 +102,7 @@ void checkImplementations(mx::GenContext& context,
         "conical_edf",
         "measured_edf",
         "absorption_vdf",
-        "anisotropic_vdf",
         "thin_surface",
-        "thin_film_bsdf",
-        "worleynoise2d",
-        "worleynoise3d",
         "geompropvalue",
         "surfacematerial",
         "volumematerial"
@@ -419,6 +415,7 @@ bool ShaderGeneratorTester::generateCode(mx::GenContext& context, const std::str
     catch (mx::Exception& e)
     {
         log << ">> Code generation failure: " << e.what() << "\n";
+        WARN(std::string(e.what()) + " in " + shaderName);
         shader = nullptr;
     }
     CHECK(shader);
@@ -501,6 +498,11 @@ void ShaderGeneratorTester::addSkipFiles()
     _skipFiles.insert("light_rig_test_1.mtlx");
     _skipFiles.insert("light_rig_test_2.mtlx");
     _skipFiles.insert("light_compound_test.mtlx");
+    _skipFiles.insert("xinclude_search_path.mtlx");
+    _skipFiles.insert("1_38_parameter_to_input.mtlx");
+    _skipFiles.insert("1_36_to_1_37.mtlx");
+    _skipFiles.insert("1_37_to_1_38.mtlx");
+    _skipFiles.insert("material_element_to_surface_material.mtlx");
 }
 
 void ShaderGeneratorTester::addSkipNodeDefs()
@@ -554,8 +556,8 @@ void ShaderGeneratorTester::registerLights(mx::DocumentPtr doc, const std::vecto
     if (!lights.empty())
     {
         // Create a list of unique nodedefs and ids for them
-        _lightIdentifierMap = computeLightIdMap(lights);
-        for (const auto& id : _lightIdentifierMap)
+        _lightIdMap = computeLightIdMap(lights);
+        for (const auto& id : _lightIdMap)
         {
             mx::NodeDefPtr nodedef = doc->getNodeDef(id.first);
             if (nodedef)
@@ -896,14 +898,13 @@ void TestSuiteOptions::print(std::ostream& output) const
     output << "\tDump uniforms and Attributes  " << dumpUniformsAndAttributes << std::endl;
     output << "\tNon-Shaded Geometry: " << unShadedGeometry.asString() << std::endl;
     output << "\tShaded Geometry: " << shadedGeometry.asString() << std::endl;
-    output << "\tGeometry Scale: " << geometryScale << std::endl;
     output << "\tEnable Direct Lighting: " << enableDirectLighting << std::endl;
     output << "\tEnable Indirect Lighting: " << enableIndirectLighting << std::endl;
-    output << "\tSpecular Environment Method: " << specularEnvironmentMethod << std::endl;
     output << "\tRadiance IBL File Path " << radianceIBLPath.asString() << std::endl;
     output << "\tIrradiance IBL File Path: " << irradianceIBLPath.asString() << std::endl;
-    output << "\tExternal library paths: " << externalLibraryPaths.asString() << std::endl;
-    output << "\tExternal test root paths: " << externalTestPaths.asString() << std::endl;
+    output << "\tExtra library paths: " << extraLibraryPaths.asString() << std::endl;
+    output << "\tRender test paths: " << renderTestPaths.asString() << std::endl;
+    output << "\tEnable Reference Quality: " << enableReferenceQuality << std::endl;
 }
 
 bool TestSuiteOptions::readOptions(const std::string& optionFile)
@@ -926,17 +927,15 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
     const std::string DUMP_GENERATED_CODE_STRING("dumpGeneratedCode");
     const std::string UNSHADED_GEOMETRY_STRING("unShadedGeometry");
     const std::string SHADED_GEOMETRY_STRING("shadedGeometry");
-    const std::string GEOMETRY_SCALE_STRING("geometryScale");
     const std::string ENABLE_DIRECT_LIGHTING("enableDirectLighting");
     const std::string ENABLE_INDIRECT_LIGHTING("enableIndirectLighting");
-    const std::string SPECULAR_ENVIRONMENT_METHOD("specularEnvironmentMethod");
     const std::string RADIANCE_IBL_PATH_STRING("radianceIBLPath");
     const std::string IRRADIANCE_IBL_PATH_STRING("irradianceIBLPath");
-    const std::string TRANSFORM_UVS_STRING("transformUVs");
     const std::string SPHERE_OBJ("sphere.obj");
     const std::string SHADERBALL_OBJ("shaderball.obj");
-    const std::string EXTERNAL_LIBRARY_PATHS("externalLibraryPaths");
-    const std::string EXTERNAL_TEST_PATHS("externalTestPaths");
+    const std::string EXTRA_LIBRARY_PATHS("extraLibraryPaths");
+    const std::string RENDER_TEST_PATHS("renderTestPaths");
+    const std::string ENABLE_REFERENCE_QUALITY("enableReferenceQuality");
     const std::string WEDGE_FILES("wedgeFiles");
     const std::string WEDGE_PARAMETERS("wedgeParameters");
     const std::string WEDGE_RANGE_MIN("wedgeRangeMin");
@@ -950,10 +949,9 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
     dumpGeneratedCode = false;
     unShadedGeometry = SPHERE_OBJ;
     shadedGeometry = SHADERBALL_OBJ;
-    geometryScale = 1.0f;
     enableDirectLighting = true;
     enableIndirectLighting = true;
-    specularEnvironmentMethod = mx::SPECULAR_ENVIRONMENT_FIS;
+    enableReferenceQuality = false;
 
     MaterialX::DocumentPtr doc = MaterialX::createDocument();
     try
@@ -1029,10 +1027,6 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
                     {
                         shadedGeometry = p->getValueString();
                     }
-                    else if (name == GEOMETRY_SCALE_STRING)
-                    {
-                        geometryScale = val->asA<float>();
-                    }
                     else if (name == ENABLE_DIRECT_LIGHTING)
                     {
                         enableDirectLighting = val->asA<bool>();
@@ -1040,10 +1034,6 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
                     else if (name == ENABLE_INDIRECT_LIGHTING)
                     {
                         enableIndirectLighting = val->asA<bool>();
-                    }
-                    else if (name == SPECULAR_ENVIRONMENT_METHOD)
-                    {
-                        specularEnvironmentMethod = (mx::HwSpecularEnvironmentMethod) val->asA<int>();
                     }
                     else if (name == RADIANCE_IBL_PATH_STRING)
                     {
@@ -1053,25 +1043,25 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
                     {
                         irradianceIBLPath = p->getValueString();
                     }
-                    else if (name == TRANSFORM_UVS_STRING)
-                    {
-                        transformUVs = val->asA<mx::Matrix44>();
-                    }
-                    else if (name == EXTERNAL_LIBRARY_PATHS)
+                    else if (name == EXTRA_LIBRARY_PATHS)
                     {
                         mx::StringVec list = mx::splitString(p->getValueString(), ",");
                         for (const auto& l : list)
                         {
-                            externalLibraryPaths.append(mx::FilePath(l));
+                            extraLibraryPaths.append(mx::FilePath(l));
                         }
                     }
-                    else if (name == EXTERNAL_TEST_PATHS)
+                    else if (name == RENDER_TEST_PATHS)
                     {
                         mx::StringVec list = mx::splitString(p->getValueString(), ",");
                         for (const auto& l : list)
                         {
-                            externalTestPaths.append(mx::FilePath(l));
+                            renderTestPaths.append(mx::FilePath(l));
                         }
+                    }
+                    else if (name == ENABLE_REFERENCE_QUALITY)
+                    {
+                        enableReferenceQuality = val->asA<bool>();
                     }
                     else if (name == WEDGE_FILES)
                     {
