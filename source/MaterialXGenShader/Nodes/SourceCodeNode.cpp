@@ -32,13 +32,13 @@ void SourceCodeNode::initialize(const InterfaceElement& element, GenContext& con
     _functionSource = impl.getAttribute("sourcecode");
     if (_functionSource.empty())
     {
-        FilePath file(impl.getAttribute("file"));
-        file = context.resolveSourceFile(file);
-        _functionSource = readFile(file);
+        FilePath localPath = FilePath(impl.getActiveSourceUri()).getParentPath();
+        _sourceFilename = context.resolveSourceFile(impl.getAttribute("file"), localPath);
+        _functionSource = readFile(_sourceFilename);
         if (_functionSource.empty())
         {
-            throw ExceptionShaderGenError("Failed to get source code from file '" + file.asString() +
-                "' used by implementation '" + impl.getName() + "'");
+            throw ExceptionShaderGenError("Failed to get source code from file '" + _sourceFilename.asString() +
+                                          "' used by implementation '" + impl.getName() + "'");
         }
     }
 
@@ -71,11 +71,18 @@ void SourceCodeNode::emitFunctionDefinition(const ShaderNode&, GenContext& conte
 {
     BEGIN_SHADER_STAGE(stage, Stage::PIXEL)
         // Emit function definition for non-inlined functions
-        if (!_inlined && !_functionSource.empty())
+        if (!_functionSource.empty())
         {
-            const ShaderGenerator& shadergen = context.getShaderGenerator();
-            shadergen.emitBlock(_functionSource, context, stage);
-            shadergen.emitLineBreak(stage);
+            if (!_sourceFilename.isEmpty())
+            {
+                stage.addSourceDependency(_sourceFilename);
+            }
+            if (!_inlined)
+            {
+                const ShaderGenerator& shadergen = context.getShaderGenerator();
+                shadergen.emitBlock(_functionSource, _sourceFilename, context, stage);
+                shadergen.emitLineBreak(stage);
+            }
         }
     END_SHADER_STAGE(stage, Stage::PIXEL)
 }

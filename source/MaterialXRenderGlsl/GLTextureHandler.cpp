@@ -6,7 +6,7 @@
 #include <MaterialXRenderGlsl/GLTextureHandler.h>
 
 #include <MaterialXRenderGlsl/GlslProgram.h>
-#include <MaterialXRenderGlsl/External/GLew/glew.h>
+#include <MaterialXRenderGlsl/External/Glad/glad.h>
 
 #include <MaterialXRender/ShaderRenderer.h>
 
@@ -19,7 +19,7 @@ GLTextureHandler::GLTextureHandler(ImageLoaderPtr imageLoader) :
 {
     if (!glActiveTexture)
     {
-        glewInit();
+        gladLoadGL();
     }
 
     int maxTextureUnits;
@@ -70,7 +70,7 @@ bool GLTextureHandler::bindImage(ImagePtr image, const ImageSamplingProperties& 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, vaddressMode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilterType);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilterType);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
 
     return true;
 }
@@ -211,12 +211,11 @@ int GLTextureHandler::mapAddressModeToGL(ImageSamplingProperties::AddressMode ad
 
 int GLTextureHandler::mapFilterTypeToGL(ImageSamplingProperties::FilterType filterTypeEnum, bool enableMipmaps)
 {
-    int filterType = enableMipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
     if (filterTypeEnum == ImageSamplingProperties::FilterType::CLOSEST)
     {
-        filterType = enableMipmaps ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST;
+        return enableMipmaps ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST;
     }
-    return filterType;
+    return enableMipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR;
 }
 
 void GLTextureHandler::mapTextureFormatToGL(Image::BaseType baseType, unsigned int channelCount, bool srgb,

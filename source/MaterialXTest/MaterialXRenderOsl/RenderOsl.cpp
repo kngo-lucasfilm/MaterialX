@@ -40,7 +40,7 @@ class TangentOsl : public mx::ShaderNodeImpl
         BEGIN_SHADER_STAGE(stage, mx::Stage::PIXEL)
             shadergen.emitLineBegin(stage);
             shadergen.emitOutput(node.getOutput(), true, false, context, stage);
-            shadergen.emitString(" = normalize(vector(N.z, 0, -N.x))", stage);
+            shadergen.emitString(" = normalize(vector(N[2], 0, -N[0]))", stage);
             shadergen.emitLineEnd(stage);
         END_SHADER_STAGE(stage, mx::Stage::PIXEL)
     }
@@ -61,7 +61,7 @@ class BitangentOsl : public mx::ShaderNodeImpl
         BEGIN_SHADER_STAGE(stage, mx::Stage::PIXEL)
             shadergen.emitLineBegin(stage);
             shadergen.emitOutput(node.getOutput(), true, false, context, stage);
-            shadergen.emitString(" = normalize(cross(N, vector(N.z, 0, -N.x)))", stage);
+            shadergen.emitString(" = normalize(cross(N, vector(N[2], 0, -N[0])))", stage);
             shadergen.emitLineEnd(stage);
         END_SHADER_STAGE(stage, mx::Stage::PIXEL)
     }
@@ -75,19 +75,16 @@ class OslShaderRenderTester : public RenderUtil::ShaderRenderTester
     explicit OslShaderRenderTester(mx::ShaderGeneratorPtr shaderGenerator) :
         RenderUtil::ShaderRenderTester(shaderGenerator)
     {
+        // Preprocess to resolve to absolute image file names 
+        // and all non-POSIX separators must be converted to POSIX ones (this only affects running on Windows)
+        _resolveImageFilenames = true;
+        _customFilenameResolver = mx::StringResolver::create();
+        _customFilenameResolver->setFilenameSubstitution("\\\\", "/");
+        _customFilenameResolver->setFilenameSubstitution("\\", "/");
+
     }
 
   protected:
-    void registerSourceCodeSearchPaths(mx::GenContext& context) override
-    {
-        // Include extra OSL implementation files
-        mx::FilePath searchPath = mx::FilePath::getCurrentPath() / mx::FilePath("libraries");
-        context.registerSourceCodeSearchPath(searchPath / mx::FilePath("stdlib/genosl/include"));
-
-        // Include current path to find resources.
-        context.registerSourceCodeSearchPath(mx::FilePath::getCurrentPath());
-    }
-
     void createRenderer(std::ostream& log) override;
 
     bool runRenderer(const std::string& shaderName,
@@ -233,14 +230,6 @@ bool OslShaderRenderTester::runRenderer(const std::string& shaderName,
                 return false;
             }
             CHECK(shader->getSourceCode().length() > 0);
-
-            // Convert relative paths to absolute, using hardcoded logic for now.
-            mx::StringMap resourceStringMap =
-            {
-                {"\"../../../Images", "\"resources/Images"},
-                {"\"textures/", "\"resources/Materials/TestSuite/libraries/metal/textures"}
-            };
-            shader->setSourceCode(mx::replaceSubstrings(shader->getSourceCode(), resourceStringMap));
 
             std::string shaderPath;
             mx::FilePath outputFilePath = outputPath;

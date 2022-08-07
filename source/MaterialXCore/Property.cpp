@@ -5,8 +5,6 @@
 
 #include <MaterialXCore/Property.h>
 
-#include <MaterialXCore/Document.h>
-
 MATERIALX_NAMESPACE_BEGIN
 
 const string PropertyAssign::PROPERTY_ATTRIBUTE = "property";
@@ -32,7 +30,7 @@ void PropertyAssign::setCollection(ConstCollectionPtr collection)
 
 CollectionPtr PropertyAssign::getCollection() const
 {
-    return resolveRootNameReference<Collection>(getCollectionString());
+    return resolveNameReference<Collection>(getCollectionString());
 }
 
 //
@@ -53,7 +51,7 @@ void PropertySetAssign::setPropertySet(ConstPropertySetPtr propertySet)
 
 PropertySetPtr PropertySetAssign::getPropertySet() const
 {
-    return resolveRootNameReference<PropertySet>(getPropertySetString());
+    return resolveNameReference<PropertySet>(getPropertySetString());
 }
 
 MATERIALX_NAMESPACE_END

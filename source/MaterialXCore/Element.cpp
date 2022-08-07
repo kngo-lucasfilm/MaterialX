@@ -6,7 +6,6 @@
 #include <MaterialXCore/Element.h>
 
 #include <MaterialXCore/Document.h>
-#include <MaterialXCore/Node.h>
 #include <MaterialXCore/Util.h>
 
 #include <iterator>
@@ -456,7 +455,7 @@ string Element::asString() const
     return res;
 }
 
-void Element::validateRequire(bool expression, bool& res, string* message, string errorDesc) const
+void Element::validateRequire(bool expression, bool& res, string* message, const string& errorDesc) const
 {
     if (!expression)
     {
@@ -474,7 +473,7 @@ void Element::validateRequire(bool expression, bool& res, string* message, strin
 
 TypeDefPtr TypedElement::getTypeDef() const
 {
-    return resolveRootNameReference<TypeDef>(getType());
+    return resolveNameReference<TypeDef>(getType());
 }
 
 //

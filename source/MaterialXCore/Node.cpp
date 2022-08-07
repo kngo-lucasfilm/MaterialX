@@ -92,7 +92,7 @@ NodeDefPtr Node::getNodeDef(const string& target, bool allowRoughMatch) const
 {
     if (hasNodeDefString())
     {
-        return resolveRootNameReference<NodeDef>(getNodeDefString());
+        return resolveNameReference<NodeDef>(getNodeDefString());
     }
     vector<NodeDefPtr> nodeDefs = getDocument()->getMatchingNodeDefs(getQualifiedName(getCategory()));
     vector<NodeDefPtr> secondary = getDocument()->getMatchingNodeDefs(getCategory());
@@ -197,7 +197,7 @@ OutputPtr Node::getNodeDefOutput(ElementPtr connectingElement)
 vector<PortElementPtr> Node::getDownstreamPorts() const
 {
     vector<PortElementPtr> downstreamPorts;
-    for (PortElementPtr port : getDocument()->getMatchingPorts(getName()))
+    for (PortElementPtr port : getDocument()->getMatchingPorts(getQualifiedName(getName())))
     {
         if (port->getConnectedNode() == getSelf())
         {
@@ -647,20 +647,44 @@ void NodeGraph::setNodeDef(ConstNodeDefPtr nodeDef)
     }
 }
 
-InputPtr Node::addInputFromNodeDef(const string& name)
+InputPtr Node::addInputFromNodeDef(const string& inputName)
 {
-    InputPtr nodeInput = getInput(name);
+    InputPtr nodeInput = getInput(inputName);
     if (!nodeInput)
     {
         NodeDefPtr nodeDef = getNodeDef();
-        InputPtr nodeDefInput = nodeDef ? nodeDef->getActiveInput(name) : nullptr;
+        InputPtr nodeDefInput = nodeDef ? nodeDef->getActiveInput(inputName) : nullptr;
         if (nodeDefInput)
         {
-            nodeInput = addInput(nodeDefInput->getName());
-            nodeInput->copyContentFrom(nodeDefInput);
+            nodeInput = addInput(nodeDefInput->getName(), nodeDefInput->getType());
+            if (nodeDefInput->hasValueString())
+            {
+                nodeInput->setValueString(nodeDefInput->getValueString());
+            }
         }
     }
     return nodeInput;
+}
+
+void Node::addInputsFromNodeDef()
+{
+    NodeDefPtr nodeDef = getNodeDef();
+    if (nodeDef)
+    {
+        for (InputPtr nodeDefInput : nodeDef->getActiveInputs())
+        {
+            const string& inputName = nodeDefInput->getName();
+            InputPtr nodeInput = getInput(inputName);
+            if (!nodeInput)
+            {
+                nodeInput = addInput(inputName, nodeDefInput->getType());
+                if (nodeDefInput->hasValueString())
+                {
+                    nodeInput->setValueString(nodeDefInput->getValueString());
+                }
+            }
+        }
+    }
 }
 
 void NodeGraph::addInterfaceName(const string& inputPath, const string& interfaceName)
@@ -719,7 +743,7 @@ void NodeGraph::modifyInterfaceName(const string& inputPath, const string& inter
 
 NodeDefPtr NodeGraph::getNodeDef() const
 {
-    NodeDefPtr nodedef = resolveRootNameReference<NodeDef>(getNodeDefString());
+    NodeDefPtr nodedef = resolveNameReference<NodeDef>(getNodeDefString());
     // If not directly defined look for an implementation which has a nodedef association
     if (!nodedef)
     {

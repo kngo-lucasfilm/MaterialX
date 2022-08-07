@@ -5,8 +5,6 @@
 
 #include <MaterialXCore/Document.h>
 
-#include <MaterialXCore/Util.h>
-
 #include <mutex>
 
 MATERIALX_NAMESPACE_BEGIN
@@ -22,7 +20,9 @@ NodeDefPtr getShaderNodeDef(ElementPtr shaderRef)
     if (shaderRef->hasAttribute(NodeDef::NODE_DEF_ATTRIBUTE))
     {
         string nodeDefString = shaderRef->getAttribute(NodeDef::NODE_DEF_ATTRIBUTE);
-        return shaderRef->resolveRootNameReference<NodeDef>(nodeDefString);
+        ConstDocumentPtr doc = shaderRef->getDocument();
+        NodeDefPtr child = doc->getNodeDef(shaderRef->getQualifiedName(nodeDefString));
+        return child ? child : doc->getNodeDef(nodeDefString);
     }
     if (shaderRef->hasAttribute(NodeDef::NODE_ATTRIBUTE))
     {
@@ -171,7 +171,7 @@ void Document::initialize()
 }
 
 NodeDefPtr Document::addNodeDefFromGraph(const NodeGraphPtr nodeGraph, const string& nodeDefName, const string& node,
-                                         const string& version, bool isDefaultVersion, const string& group, string& newGraphName)
+                                         const string& version, bool isDefaultVersion, const string& group, const string& newGraphName)
 {
     if (getNodeDef(nodeDefName))
     {
@@ -607,7 +607,7 @@ void Document::upgradeVersion()
             }
 
             GeomInfoPtr udimSetInfo = addGeomInfo();
-            udimSetInfo->setGeomPropValue("udimset", udimSetString, getTypeString<StringVec>());
+            udimSetInfo->setGeomPropValue(UDIM_SET_PROPERTY, udimSetString, getTypeString<StringVec>());
         }
 
         minorVersion = 34;

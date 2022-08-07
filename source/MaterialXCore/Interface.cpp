@@ -7,8 +7,6 @@
 
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
-#include <MaterialXCore/Material.h>
-#include <MaterialXCore/Node.h>
 
 #include <stdexcept>
 
@@ -67,6 +65,98 @@ NodePtr PortElement::getConnectedNode() const
     return graph ? graph->getNode(getNodeName()) : nullptr;
 }
 
+void PortElement::setConnectedOutput(ConstOutputPtr output)
+{
+    if (output)
+    {
+        setOutputString(output->getName());
+        ConstElementPtr parent = output->getParent();
+        if (parent->isA<NodeGraph>())
+        {
+            setNodeGraphString(parent->getName());
+            removeAttribute(NODE_NAME_ATTRIBUTE);
+        }
+        else if (parent->isA<Node>())
+        {
+            setNodeName(parent->getName());
+            removeAttribute(NODE_GRAPH_ATTRIBUTE);
+        }
+    }
+    else
+    {
+        removeAttribute(OUTPUT_ATTRIBUTE);
+        removeAttribute(NODE_GRAPH_ATTRIBUTE);
+        removeAttribute(NODE_NAME_ATTRIBUTE);
+    }
+}
+
+OutputPtr PortElement::getConnectedOutput() const
+{
+    const string& outputString = getOutputString();
+    OutputPtr result = nullptr;
+
+    // Determine the scope at which the connected output may be found.
+    ConstElementPtr parent = getParent();
+    ConstElementPtr scope = parent ? parent->getParent() : nullptr;
+
+    // Look for a nodegraph output.
+    if (hasNodeGraphString())
+    {
+        NodeGraphPtr nodeGraph = resolveNameReference<NodeGraph>(getNodeGraphString(), scope);
+        if (!nodeGraph)
+        {
+            nodeGraph = resolveNameReference<NodeGraph>(getNodeGraphString());
+        }
+        if (nodeGraph)
+        {
+            std::vector<OutputPtr> outputs = nodeGraph->getOutputs();
+            if (!outputs.empty())
+            {
+                if (outputString.empty())
+                {
+                    result = outputs[0];
+                }
+                else
+                {
+                    result = nodeGraph->getOutput(outputString);
+                }
+            }
+        }
+    }
+    // Look for a node output.
+    else if (hasNodeName())
+    {
+        const string& nodeName = getNodeName();
+        NodePtr node = resolveNameReference<Node>(nodeName, scope);
+        if (!node)
+        {
+            node = resolveNameReference<Node>(nodeName);
+        }
+        if (node)
+        {
+            std::vector<OutputPtr> outputs = node->getOutputs();
+            if (!outputs.empty())
+            {
+                if (outputString.empty())
+                {
+                    result = outputs[0];
+                }
+                else
+                {
+                    result = node->getOutput(outputString);
+                }
+            }
+        }
+    }
+
+    // Look for an output at document scope.
+    if (!result)
+    {
+        result = getDocument()->getOutput(outputString);
+    }
+    return result;
+}
+
 bool PortElement::validate(string* message) const
 {
     bool res = true;
@@ -74,7 +164,7 @@ bool PortElement::validate(string* message) const
     NodePtr connectedNode = getConnectedNode();
     if (hasNodeName() || hasOutputString())
     {
-        NodeGraphPtr nodeGraph = resolveRootNameReference<NodeGraph>(getNodeName());
+        NodeGraphPtr nodeGraph = resolveNameReference<NodeGraph>(getNodeName());
         if (!nodeGraph)
         {
             validateRequire(connectedNode != nullptr, res, message, "Invalid port connection");
@@ -98,7 +188,7 @@ bool PortElement::validate(string* message) const
             }
             else if (hasNodeGraphString())
             {
-                NodeGraphPtr nodeGraph = resolveRootNameReference<NodeGraph>(getNodeGraphString());
+                NodeGraphPtr nodeGraph = resolveNameReference<NodeGraph>(getNodeGraphString());
                 if (nodeGraph)
                 {
                     output = nodeGraph->getOutput(outputString);
@@ -209,95 +299,6 @@ NodePtr Input::getConnectedNode() const
     }
 
     return PortElement::getConnectedNode();
-}
-
-void Input::setConnectedOutput(ConstOutputPtr output)
-{
-    if (output)
-    {
-        setOutputString(output->getName());
-        ConstElementPtr parent = output->getParent();
-        if (parent->isA<NodeGraph>())
-        {
-            setNodeGraphString(parent->getName());
-        }
-        else
-        {
-            removeAttribute(NODE_GRAPH_ATTRIBUTE);
-        }
-    }
-    else
-    {
-        removeAttribute(OUTPUT_ATTRIBUTE);
-        removeAttribute(NODE_GRAPH_ATTRIBUTE);
-    }
-}
-
-OutputPtr Input::getConnectedOutput() const
-{
-    const string& outputString = getOutputString();
-    OutputPtr result = nullptr;
-
-    // Look for an output in a nodegraph
-    if (hasNodeGraphString())
-    {
-        NodeGraphPtr nodeGraph = resolveRootNameReference<NodeGraph>(getNodeGraphString());
-        if (nodeGraph)
-        {
-            std::vector<OutputPtr> outputs = nodeGraph->getOutputs();
-            if (!outputs.empty())
-            {
-                if (outputString.empty())
-                {
-                    result = outputs[0];
-                }
-                else
-                {
-                    result = nodeGraph->getOutput(outputString);
-                }
-            }
-        }
-    }
-    // Look for output on a node
-    else if (hasNodeName())
-    {
-        const string& nodeName = getNodeName();
-        ConstElementPtr startingElement = getParent();
-        if (startingElement)
-        {
-            // Look for a node reference above the nodegraph if input is a direct child.
-            if (startingElement->isA<NodeGraph>())
-            {
-                startingElement = startingElement->getParent();
-            }
-            if (startingElement)
-            {
-                ConstGraphElementPtr graph = startingElement->getAncestorOfType<GraphElement>();
-                NodePtr node = graph ? graph->getNode(nodeName) : nullptr;
-                if (node)
-                {
-                    std::vector<OutputPtr> outputs = node->getOutputs();
-                    if (!outputs.empty())
-                    {
-                        if (outputString.empty())
-                        {
-                            result = outputs[0];
-                        }
-                        else
-                        {
-                            result = node->getOutput(outputString);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    // Look for output in the document
-    if (!result)
-    {
-        result = getDocument()->getOutput(outputString);
-    }
-    return result;
 }
 
 InputPtr Input::getInterfaceInput() const
