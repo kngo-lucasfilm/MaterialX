@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <MaterialXRenderHw/WindowWrapper.h>
@@ -84,8 +84,12 @@ WindowWrapper::WindowWrapper(ExternalWindowHandle externalHandle,
                              DisplayHandle display)
 {
     _externalHandle = externalHandle;
+#ifndef TARGET_OS_IOS
     // Cache a pointer to the window.
     _internalHandle = NSUtilGetView(externalHandle);
+#else
+    _internalHandle = nullptr;
+#endif
 }
 
 WindowWrapper::~WindowWrapper()

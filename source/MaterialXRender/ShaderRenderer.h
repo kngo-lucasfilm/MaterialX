@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #ifndef MATERIALX_SHADERRENDERER_H
@@ -18,6 +18,10 @@
 
 MATERIALX_NAMESPACE_BEGIN
 
+/// Render context handle
+/// Provides a provision for an application to share any renderer specific settings
+using RenderContextHandle = void*;
+
 /// Shared pointer to a shader renderer
 using ShaderRendererPtr = std::shared_ptr<class ShaderRenderer>;
 
@@ -26,6 +30,12 @@ using ShaderRendererPtr = std::shared_ptr<class ShaderRenderer>;
 class MX_RENDER_API ShaderRenderer
 {
   public:
+    /// Viewing API matrix conventions designation (default to OpenGL).
+    enum class MatrixConvention
+    {
+        OpenGL = 0,
+        Metal  = 1
+    };
     /// A map with name and source code for each shader stage.
     using StageMap = StringMap;
 
@@ -36,7 +46,7 @@ class MX_RENDER_API ShaderRenderer
     /// @{
 
     /// Initialize the renderer.
-    virtual void initialize() { }
+    virtual void initialize(RenderContextHandle = nullptr) { }
 
     /// Set the camera.
     void setCamera(CameraPtr camera)
@@ -100,6 +110,9 @@ class MX_RENDER_API ShaderRenderer
     /// Validate inputs for the program.
     virtual void validateInputs() { }
 
+    /// Update the program with value of the uniform.
+    virtual void updateUniform(const string& name, ConstValuePtr value);
+
     /// Set the size of the rendered image.
     virtual void setSize(unsigned int width, unsigned int height);
 
@@ -119,22 +132,15 @@ class MX_RENDER_API ShaderRenderer
     /// @}
 
   protected:
-    ShaderRenderer() :
-        _width(0),
-        _height(0),
-        _baseType(Image::BaseType::UINT8)
-    { }
-
-    ShaderRenderer(unsigned int width, unsigned int height, Image::BaseType baseType) :
-        _width(width),
-        _height(height),
-        _baseType(baseType)
-    { }
+    ShaderRenderer(unsigned int width, unsigned int height, Image::BaseType baseType,
+        MatrixConvention matrixConvention = MatrixConvention::OpenGL);
 
   protected:
     unsigned int _width;
     unsigned int _height;
     Image::BaseType _baseType;
+
+    MatrixConvention _matrixConvention;
 
     CameraPtr _camera;
     ImageHandlerPtr _imageHandler;

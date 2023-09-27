@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <MaterialXRender/ImageHandler.h>
@@ -56,9 +56,6 @@ ImageHandler::ImageHandler(ImageLoaderPtr imageLoader)
 {
     addLoader(imageLoader);
     _zeroImage = createUniformImage(2, 2, 4, Image::BaseType::UINT8, Color4(0.0f));
-
-    // Generated shaders interpret 1x1 textures as invalid images.
-    _invalidImage = createUniformImage(1, 1, 4, Image::BaseType::UINT8, Color4(0.0f));
 }
 
 void ImageHandler::addLoader(ImageLoaderPtr loader)
@@ -118,7 +115,7 @@ bool ImageHandler::saveImage(const FilePath& filePath,
     return false;
 }
 
-ImagePtr ImageHandler::acquireImage(const FilePath& filePath)
+ImagePtr ImageHandler::acquireImage(const FilePath& filePath, const Color4& defaultColor)
 {
     // Resolve the input filepath.
     FilePath resolvedFilePath = filePath;
@@ -142,9 +139,12 @@ ImagePtr ImageHandler::acquireImage(const FilePath& filePath)
         return image;
     }
 
-    // No valid image was found, so cache the sentinel invalid image.
-    cacheImage(resolvedFilePath, _invalidImage);
-    return _invalidImage;
+    // No valid image was found, so generate a uniform texture with the given default color.
+    // TODO: This step assumes that the missing image and its default color are in the same
+    //       color space, which is not always the case.
+    ImagePtr defaultImage = createUniformImage(1, 1, 4, Image::BaseType::UINT8, defaultColor);
+    cacheImage(resolvedFilePath, defaultImage);
+    return defaultImage;
 }
 
 bool ImageHandler::bindImage(ImagePtr, const ImageSamplingProperties&)
@@ -174,7 +174,7 @@ void ImageHandler::releaseRenderResources(ImagePtr)
 {
 }
 
-ImageVec ImageHandler::getReferencedImages(DocumentPtr doc)
+ImageVec ImageHandler::getReferencedImages(ConstDocumentPtr doc)
 {
     ImageVec imageVec;
     for (ElementPtr elem : doc->traverseTree())
@@ -189,7 +189,7 @@ ImageVec ImageHandler::getReferencedImages(DocumentPtr doc)
         if (file)
         {
             ImagePtr image = acquireImage(file->getResolvedValueString());
-            if (image && image != _invalidImage)
+            if (image)
             {
                 imageVec.push_back(image);
             }
@@ -214,14 +214,6 @@ ImagePtr ImageHandler::loadImage(const FilePath& filePath)
         }
         if (image)
         {
-            // Generated shaders interpret 1x1 textures as invalid images, so valid 1x1
-            // images must be resized.
-            if (image->getWidth() == 1 && image->getHeight() == 1)
-            {
-                image = createUniformImage(2, 2, image->getChannelCount(),
-                                           image->getBaseType(), image->getTexelColor(0, 0));
-            }
-
             return image;
         }
     }
@@ -288,28 +280,38 @@ void ImageSamplingProperties::setProperties(const string& fileNameUniform,
         root = root.substr(0, pos);
     }
 
-    const string uaddressmodeStr = root + UADDRESS_MODE_SUFFIX;
-    const ShaderPort* port = uniformBlock.find(uaddressmodeStr);
+    const ShaderPort* port = uniformBlock.find(root + UADDRESS_MODE_SUFFIX);
     ValuePtr intValue = port ? port->getValue() : nullptr;
     uaddressMode = ImageSamplingProperties::AddressMode(intValue && intValue->isA<int>() ? intValue->asA<int>() : INVALID_MAPPED_INT_VALUE);
 
-    const string vaddressmodeStr = root + VADDRESS_MODE_SUFFIX;
-    port = uniformBlock.find(vaddressmodeStr);
+    port = uniformBlock.find(root + VADDRESS_MODE_SUFFIX);
     intValue = port ? port->getValue() : nullptr;
     vaddressMode = ImageSamplingProperties::AddressMode(intValue && intValue->isA<int>() ? intValue->asA<int>() : INVALID_MAPPED_INT_VALUE);
 
-    const string filtertypeStr = root + FILTER_TYPE_SUFFIX;
-    port = uniformBlock.find(filtertypeStr);
+    port = uniformBlock.find(root + FILTER_TYPE_SUFFIX);
     intValue = port ? port->getValue() : nullptr;
     filterType = ImageSamplingProperties::FilterType(intValue && intValue->isA<int>() ? intValue->asA<int>() : INVALID_MAPPED_INT_VALUE);
 
-    const string defaultColorStr = root + DEFAULT_COLOR_SUFFIX;
-    port = uniformBlock.find(defaultColorStr);
+    port = uniformBlock.find(root + DEFAULT_COLOR_SUFFIX);
+    if (!port)
+    {
+        port = uniformBlock.find(root + DEFAULT_COLOR_SUFFIX + "_cm_in");
+    }
     ValuePtr colorValue = port ? port->getValue() : nullptr;
     if (colorValue)
     {
         mapValueToColor(colorValue, defaultColor);
     }
+}
+
+bool ImageSamplingProperties::operator==(const ImageSamplingProperties& r) const
+{
+    return
+      (enableMipmaps == r.enableMipmaps &&
+       uaddressMode  == r.uaddressMode  &&
+       vaddressMode  == r.vaddressMode  &&
+       filterType    == r.filterType    &&
+       defaultColor  == r.defaultColor)  ;
 }
 
 MATERIALX_NAMESPACE_END

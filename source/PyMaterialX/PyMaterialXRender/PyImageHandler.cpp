@@ -1,6 +1,6 @@
 //
-// TM & (c) 2019 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <PyMaterialX/PyMaterialX.h>
@@ -41,7 +41,8 @@ void bindPyImageHandler(py::module& mod)
         .def("addLoader", &mx::ImageHandler::addLoader)
         .def("saveImage", &mx::ImageHandler::saveImage,
             py::arg("filePath"), py::arg("image"), py::arg("verticalFlip") = false)
-        .def("acquireImage", &mx::ImageHandler::acquireImage)
+        .def("acquireImage", &mx::ImageHandler::acquireImage,
+            py::arg("filePath"), py::arg("defaultColor") = mx::Color4(0.0f))
         .def("bindImage", &mx::ImageHandler::bindImage)
         .def("unbindImage", &mx::ImageHandler::unbindImage)
         .def("unbindImages", &mx::ImageHandler::unbindImages)
@@ -54,6 +55,5 @@ void bindPyImageHandler(py::module& mod)
             py::arg("image") = nullptr)
         .def("clearImageCache", &mx::ImageHandler::clearImageCache)
         .def("getZeroImage", &mx::ImageHandler::getZeroImage)
-        .def("getInvalidImage", &mx::ImageHandler::getInvalidImage)
         .def("getReferencedImages", &mx::ImageHandler::getReferencedImages);
 }

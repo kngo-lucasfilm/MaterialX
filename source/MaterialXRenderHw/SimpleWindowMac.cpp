@@ -1,9 +1,11 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #if defined(__APPLE__)
+
+#ifndef TARGET_OS_IOS
 
 #include <MaterialXRenderHw/SimpleWindow.h>
 #include <MaterialXRenderHw/WindowCocoaWrappers.h>
@@ -40,5 +42,7 @@ SimpleWindow::~SimpleWindow()
 }
 
 MATERIALX_NAMESPACE_END
+
+#endif
 
 #endif

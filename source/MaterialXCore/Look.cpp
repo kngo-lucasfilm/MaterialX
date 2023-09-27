@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <MaterialXCore/Look.h>
@@ -29,7 +29,7 @@ vector<MaterialAssignPtr> getGeometryBindings(ConstNodePtr materialNode, const s
         {
             if (matAssign->getReferencedMaterial() == materialNode)
             {
-                if (geomStringsMatch(geom, matAssign->getActiveGeom()))
+                if (geomStringsMatch(matAssign->getActiveGeom(), geom, true))
                 {
                     matAssigns.push_back(matAssign);
                     continue;

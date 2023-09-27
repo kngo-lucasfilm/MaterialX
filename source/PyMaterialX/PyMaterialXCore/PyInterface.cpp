@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <PyMaterialX/PyMaterialX.h>
@@ -93,6 +93,7 @@ void bindPyInterface(py::module& mod)
         .def("getDefaultVersion", &mx::InterfaceElement::getDefaultVersion)
         .def("getDeclaration", &mx::InterfaceElement::getDeclaration,
             py::arg("target") = mx::EMPTY_STRING)
+        .def("clearContent", &mx::InterfaceElement::clearContent)
         .def("hasExactInputMatch", &mx::InterfaceElement::hasExactInputMatch,
             py::arg("declaration"), py::arg("message") = nullptr)
         BIND_INTERFACE_TYPE_INSTANCE(integer, int)

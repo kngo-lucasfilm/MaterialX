@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <MaterialXCore/Definition.h>
@@ -72,15 +72,27 @@ InterfaceElementPtr NodeDef::getImplementation(const string& target) const
     const TargetDefPtr targetDef = getDocument()->getTargetDef(target);
     const StringVec candidateTargets = targetDef ? targetDef->getMatchingTargets() : StringVec();
 
-    // Search the candidate targets in order
+    // First, search for a target-specific match.
     for (const string& candidateTarget : candidateTargets)
     {
         for (InterfaceElementPtr interface : interfaces)
         {
-            if (targetStringsMatch(interface->getTarget(), candidateTarget))
+            const std::string& interfaceTarget = interface->getTarget();
+            if (!interfaceTarget.empty() && targetStringsMatch(interfaceTarget, candidateTarget))
             {
                 return interface;
             }
+        }
+    }
+    
+    // Then search for a generic match.
+    for (InterfaceElementPtr interface : interfaces)
+    {
+        // Look for interfaces without targets
+        const std::string& interfaceTarget = interface->getTarget();
+        if (interfaceTarget.empty())
+        {
+            return interface;
         }
     }
 
@@ -107,9 +119,9 @@ bool NodeDef::isVersionCompatible(const string& version) const
     return false;
 }
 
-ConstNodeDefPtr NodeDef::getDeclaration(const string&) const
+ConstInterfaceElementPtr NodeDef::getDeclaration(const string&) const
 {
-    return getSelf()->asA<NodeDef>();
+    return getSelf()->asA<InterfaceElement>();
 }
 
 //
@@ -140,7 +152,7 @@ bool Implementation::validate(string* message) const
     return InterfaceElement::validate(message) && res;
 }
 
-ConstNodeDefPtr Implementation::getDeclaration(const string&) const
+ConstInterfaceElementPtr Implementation::getDeclaration(const string&) const
 {
     return getNodeDef();
 }

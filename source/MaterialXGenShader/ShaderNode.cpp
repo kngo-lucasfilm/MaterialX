@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <MaterialXGenShader/ShaderNode.h>
@@ -27,9 +27,9 @@ ShaderPort::ShaderPort(ShaderNode* node, const TypeDesc* type, const string& nam
 {
 }
 
-string ShaderPort::getFullName() const 
-{ 
-    return (_node->getName() + "_" + _name); 
+string ShaderPort::getFullName() const
+{
+    return (_node->getName() + "_" + _name);
 }
 
 //
@@ -83,7 +83,6 @@ ShaderNode* ShaderInput::getConnectedSibling() const
     return nullptr;
 }
 
-
 //
 // ShaderOutput methods
 //
@@ -103,10 +102,9 @@ void ShaderOutput::breakConnection(ShaderInput* dst)
     if (std::find(_connections.begin(), _connections.end(), dst) == _connections.end())
     {
         throw ExceptionShaderGenError(
-            "Cannot break non-existent connection from output: " + getFullName()
-            + " to input: " + dst->getFullName());
+            "Cannot break non-existent connection from output: " + getFullName() + " to input: " + dst->getFullName());
     }
-    dst->breakConnection(); 
+    dst->breakConnection();
 }
 
 void ShaderOutput::breakConnections()
@@ -120,24 +118,23 @@ void ShaderOutput::breakConnections()
     if (!_connections.empty())
     {
         throw ExceptionShaderGenError("Number of output connections not broken properly'" + std::to_string(_connections.size()) +
-            " for output: " + getFullName());
+                                      " for output: " + getFullName());
     }
 }
 
 namespace
 {
-    ShaderNodePtr createEmptyNode()
-    {
-        return std::make_shared<ShaderNode>(nullptr, "");
-    }
+ShaderNodePtr createEmptyNode()
+{
+    return std::make_shared<ShaderNode>(nullptr, "");
 }
+} // namespace
 
 const ShaderNodePtr ShaderNode::NONE = createEmptyNode();
 
 const string ShaderNode::CONSTANT = "constant";
+const string ShaderNode::DOT = "dot";
 const string ShaderNode::IMAGE = "image";
-const string ShaderNode::COMPARE = "compare";
-const string ShaderNode::SWITCH = "switch";
 const string ShaderNode::SURFACESHADER = "surfaceshader";
 const string ShaderNode::SCATTER_MODE = "scatter_mode";
 const string ShaderNode::BSDF_R = "R";
@@ -146,6 +143,7 @@ const string ShaderNode::TEXTURE2D_GROUPNAME = "texture2d";
 const string ShaderNode::TEXTURE3D_GROUPNAME = "texture3d";
 const string ShaderNode::PROCEDURAL2D_GROUPNAME = "procedural2d";
 const string ShaderNode::PROCEDURAL3D_GROUPNAME = "procedural3d";
+const string ShaderNode::GEOMETRIC_GROUPNAME = "geometric";
 
 //
 // ShaderNode methods
@@ -159,69 +157,6 @@ ShaderNode::ShaderNode(const ShaderGraph* parent, const string& name) :
 {
 }
 
-bool ShaderNode::referencedConditionally() const
-{
-    if (_scopeInfo.type == ShaderNode::ScopeInfo::SINGLE)
-    {
-        int numBranches = 0;
-        uint32_t mask = _scopeInfo.conditionBitmask;
-        for (; mask != 0; mask >>= 1)
-        {
-            if (mask & 1)
-            {
-                numBranches++;
-            }
-        }
-        return numBranches > 0;
-    }
-    return false;
-}
-
-void ShaderNode::ScopeInfo::adjustAtConditionalInput(ShaderNode* condNode, int branch, uint32_t fullMask)
-{
-    if (type == ScopeInfo::GLOBAL || (type == ScopeInfo::SINGLE && conditionBitmask == fullConditionMask))
-    {
-        type = ScopeInfo::SINGLE;
-        conditionalNode = condNode;
-        conditionBitmask = 1 << branch;
-        fullConditionMask = fullMask;
-    }
-    else if (type == ScopeInfo::SINGLE)
-    {
-        type = ScopeInfo::MULTIPLE;
-        conditionalNode = nullptr;
-    }
-}
-
-void ShaderNode::ScopeInfo::merge(const ScopeInfo &fromScope)
-{
-    if (type == ScopeInfo::UNKNOWN || fromScope.type == ScopeInfo::GLOBAL)
-    {
-        *this = fromScope;
-    }
-    else if (type == ScopeInfo::GLOBAL)
-    {
-
-    }
-    else if (type == ScopeInfo::SINGLE && fromScope.type == ScopeInfo::SINGLE && conditionalNode == fromScope.conditionalNode)
-    {
-        conditionBitmask |= fromScope.conditionBitmask;
-
-        // This node is needed for all branches so it is no longer conditional
-        if (conditionBitmask == fullConditionMask)
-        {
-            type = ScopeInfo::GLOBAL;
-            conditionalNode = nullptr;
-        }
-    }
-    else
-    {
-        // NOTE: Right now multiple scopes is not really used, it works exactly as ScopeInfo::GLOBAL
-        type = ScopeInfo::MULTIPLE;
-        conditionalNode = nullptr;
-    }
-}
-
 ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, const NodeDef& nodeDef, GenContext& context)
 {
     ShaderNodePtr newNode = std::make_shared<ShaderNode>(parent, name);
@@ -233,7 +168,7 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
     if (!newNode->_impl)
     {
         throw ExceptionShaderGenError("Could not find a matching implementation for node '" + nodeDef.getNodeString() +
-            "' matching target '" + shadergen.getTarget() + "'");
+                                      "' matching target '" + shadergen.getTarget() + "'");
     }
 
     // Create interface from nodedef
@@ -350,14 +285,10 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
     else if (nodeDef.getNodeString() == CONSTANT)
     {
         newNode->_classification = Classification::TEXTURE | Classification::CONSTANT;
-    }
-    else if (nodeDef.getNodeString() == COMPARE)
+    }    
+    else if (nodeDef.getNodeString() == DOT)
     {
-        newNode->_classification = Classification::TEXTURE | Classification::CONDITIONAL | Classification::IFELSE;
-    }
-    else if (nodeDef.getNodeString() == SWITCH)
-    {
-        newNode->_classification = Classification::TEXTURE | Classification::CONDITIONAL | Classification::SWITCH;
+        newNode->_classification = Classification::TEXTURE | Classification::DOT;
     }
     // Third, check for file texture classification by group name
     else if (groupName == TEXTURE2D_GROUPNAME || groupName == TEXTURE3D_GROUPNAME)
@@ -373,6 +304,10 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
     else if (groupName == TEXTURE3D_GROUPNAME || groupName == PROCEDURAL3D_GROUPNAME)
     {
         newNode->_classification |= Classification::SAMPLE3D;
+    }
+    else if (groupName == GEOMETRIC_GROUPNAME)
+    {
+        newNode->_classification |= Classification::GEOMETRIC;
     }
 
     // Create any metadata.
@@ -436,7 +371,17 @@ void ShaderNode::initialize(const Node& node, const NodeDef& nodeDef, GenContext
         ShaderInput* input = getInput(nodeValue->getName());
         if (input)
         {
-            input->setPath(nodeValue->getNamePath());
+            string path = nodeValue->getNamePath();
+            InputPtr nodeInput = nodeValue->asA<Input>();
+            if (nodeInput)
+            {
+                InputPtr interfaceInput = nodeInput->getInterfaceInput();
+                if (interfaceInput)
+                {
+                    path = interfaceInput->getNamePath();
+                }
+            }
+            input->setPath(path);
         }
     }
 

@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #ifndef MATERIALX_VALUE_H
@@ -198,7 +198,7 @@ template <class T> class MX_CORE_API TypedValue : public Value
 class MX_CORE_API ScopedFloatFormatting
 {
   public:
-    explicit ScopedFloatFormatting(Value::FloatFormat format, int precision = 6);
+    explicit ScopedFloatFormatting(Value::FloatFormat format, int precision = -1);
     ~ScopedFloatFormatting();
 
   private:

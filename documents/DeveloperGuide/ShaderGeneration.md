@@ -29,82 +29,83 @@ In the following sub-sections each of these methods are explained. For all metho
 Provided code generators support a very simple expression language for inlining code. This is useful for simple nodes where the operation can be expressed as a single line of code. Inlining will reduce the number of function calls and produce more compact code. The syntax to use is the same as the target shading language, with the addition of using the node’s input ports as variables wrapped in double curly brackets: `{{input}}`. The code generator will replace these variables with values assigned or connected to the respective inputs. Figure 2 gives an example.
 
 Connecting the expression to the nodedef is done using an `<implementation>` element as seen in
-Figure 2. The file extension is used to differentiate inline expressions from source code functions, using `filename.inline`.
+Figure 2. The first option is to keep inline code in a file. The file extension is used to differentiate inline expressions from source code functions, using `filename.inline`. The second option is to directly embed the inlined code using `sourcecode`. This is the recommended approach for inlining if there the logic can fit on one line of code.
 
 ```xml
 // Nodedef elements for node <add>
-<nodedef name="ND_add_float" node="add" type="float" defaultinput="in1">
-  <input name="in1" type="float"/>
-  <input name="in2" type="float"/>
+<nodedef name="ND_add_float" node="add">
+  <input name="in1" type="float" />
+  <input name="in2" type="float" />
+  <output name="out" type="float" defaultinput="in1" />
 </nodedef>
-<nodedef name="ND_add_color3" node="add" type="color3" defaultinput="in1">
-  <input name="in1" type="color3"/>
-  <input name="in2" type="color3"/>
+<nodedef name="ND_add_color3" node="add" type="color3">
+  <input name="in1" type="color3" />
+  <input name="in2" type="color3" />
+  <output name="out" type="color3" defaultinput="in1" />
 </nodedef>
 <... more types ...>
 
 // Implementation elements for node <add>
-<implementation name="IM_add_float" nodedef="ND_add_float" file="mx_add.inline"/>
-<implementation name="IM_add_color3" nodedef="ND_add_color3" file="mx_add.inline"/>
+<implementation name="IM_add_float" nodedef="ND_add_float" file="mx_add.inline" />
+<implementation name="IM_add_color3" nodedef="ND_add_color3" file="mx_add.inline" />
 <... more types ...>
 
 // Nodedef elements for node <mix>
-<nodedef name="ND_mix_float" node="mix" type="float" defaultinput="bg">
-  <input name="fg" type="float"/>
-  <input name="bg" type="float"/>
-  <input name="mix" type="float"/>
+<nodedef name="ND_mix_float" node="mix">
+  <input name="fg" type="float" />
+  <input name="bg" type="float" />
+  <input name="mix" type="float" />
+  <output name="out" type="float" defaultinput="bg" />
 </nodedef>
-<nodedef name="ND_mix_color3" node="mix" type="color3" defaultinput="bg">
-  <input name="fg" type="color3"/>
-  <input name="bg" type="color3"/>
-  <input name="mix" type="float"/>
+<nodedef name="ND_mix_color3" node="mix">
+  <input name="fg" type="color3" />
+  <input name="bg" type="color3" />
+  <input name="mix" type="color3" />
+  <output name="out" type="color3" defaultinput="bg" />
 </nodedef>
 <... more types ...>
 
 // Implementation elements for node <mix>
-<implementation name="IM_mix_float" nodedef="ND_mix_float" file="mx_mix.inline"/>
-<implementation name="IM_mix_color3" nodedef="ND_mix_color3" file="mx_mix.inline"/>
+<implementation name="IM_mix_float" nodedef="ND_mix_float" sourcecode="mix({{bg}}, {{fg}}, {{mix}})" />
+<implementation name="IM_mix_color3" nodedef="ND_mix_color3" sourcecode="mix({{bg}}, {{fg}}, {{mix}})" />
 <... more types ...>
 ```
 ```c++
 // File 'mx_add.inline' contains:
 {{in1}} + {{in2}}
-
-// File 'mx_mix.inline' contains:
-mix({{bg}}, {{fg}}, {{mix}})
 ```
 
-**Figure 2**: Inline expressions for implementing nodes `<add>` and `<mix>`.
+**Figure 2**: Inline expressions for implementing nodes `<add>` and `<mix>`. The code for `<add>` is stored in an additional file, while the code for `<mix>` is specified as part of the
+`<implemenentation>` declaration. 
 
 ### 1.3.2 Shading Language Function
 For nodes that can’t be implemented by inline expressions a function definition can be used instead. The function signature should match the nodedefs interface with inputs and outputs. See Figure 3 for an example. Connecting the source code to the nodedef is done using an `<implementation>` element, see the [MaterialX specification](../Specification/MaterialX.v1.36.Spec.pdf) for more information.
 
 ```xml
 // Nodedef element
-<nodedef name="ND_image_color3" node="image" type="color3" default="0.0, 0.0, 0.0">
-  <parameter name="file" type="filename"/>
-  <parameter name="layer" type="string" value=""/>
-  <parameter name="default" type="color3" value="0.0, 0.0, 0.0"/>
-  <input name="texcoord" type="vector2" defaultgeomprop="texcoord"/>
-  <parameter name="filtertype" type="string" value="linear"/>
-  <parameter name="uaddressmode" type="string" value="periodic"/>
-  <parameter name="vaddressmode" type="string" value="periodic"/>
-  <parameter name="framerange" type="string" value=""/>
-  <parameter name="frameoffset" type="integer" value="0"/>
-  <parameter name="frameendaction" type="string" value="black"/>
+<nodedef name="ND_image_color3" node="image">
+  <input name="file" type="filename" value="" uniform="true" />
+  <input name="layer" type="string" value="" uniform="true" />
+  <input name="default" type="color3" value="0.0, 0.0, 0.0" />
+  <input name="texcoord" type="vector2" defaultgeomprop="UV0" />
+  <input name="uaddressmode" type="string" value="periodic" uniform="true" />
+  <input name="vaddressmode" type="string" value="periodic" uniform="true" />
+  <input name="filtertype" type="string" value="linear" uniform="true" />
+  <input name="framerange" type="string" value="" uniform="true" />
+  <input name="frameoffset" type="integer" value="0" uniform="true" />
+  <input name="frameendaction" type="string" value="constant" uniform="true" />
+  <output name="out" type="color3" default="0.0, 0.0, 0.0" />
 </nodedef>
 
 // Implementation element
-<implementation name="IM_image_color3_osl" nodedef="ND_image_color3"
-    file="mx_image_color3.osl" language="osl"/>
+<implementation name="IM_image_color3_osl" nodedef="ND_image_color3" file="mx_image_color3.osl" target="genosl" />
 ```
 ```c++
 // File 'mx_image_color3.osl' contains:
 void mx_image_color3(string file, string layer, color defaultvalue,
-                     vector2 texcoord, string filtertype,
-                     string uaddressmode, string vaddressmode,
-                     string framerange, int frameoffset,
-                     string frameendaction, output color out)
+                     vector2 texcoord, string uaddressmode, string vaddressmode, string filtertype,
+                     string framerange, int frameoffset, string frameendaction,
+                     output color out)
 {
     // Sample the texture
     out = texture(file, texcoord.x, texcoord.y,
@@ -122,40 +123,28 @@ As an alternative to defining source code, there is also an option to reference 
 This is useful for creating a compound for a set of nodes performing some common operation. It can then be referenced as a node inside other nodegraphs. It is also useful for creating compatibility graphs for unknown nodes. If a node is created by some third party, and its implementation is unknown or proprietary, a compatibility graph can be created using known nodes and be referenced as a stand-in implementation. Linking a nodegraph to a nodedef is done by simply setting a nodedef attribute on the nodegraph definition. See Figure 4 for an example.
 
 ```xml
-<nodedef name="ND_checker_float" node="checker" type="float">
-  <input name="scale" type="vector2" value="8.0, 8.0"/>
+<nodedef name="ND_checker_float" node="checker">
+  <input name="texcoord" type="vector2" defaultgeomprop="UV0" />
+  <input name="uvtiling" type="vector2" value="8.0, 8.0" />
+  <output name="out" type="float" />
 </nodedef>
 <nodegraph name="IM_checker_float" nodedef="ND_checker_float">
-  <texcoord name="texcoord1" type="vector2">
-    <parameter name="index" type="integer" value="0"/>
-  </texcoord>
   <multiply name="mult1" type="vector2">
-    <input name="in1" type="vector2" nodename="texcoord1"/>
-    <input name="in2" type="vector2" interfacename="scale"/>
+    <input name="in1" type="vector2" interfacename="texcoord" />
+    <input name="in2" type="vector2" interfacename="uvtiling" />
   </multiply>
-  <swizzle name="swizz_x" type="float">
-    <input name="in" type="vector2" nodename="mult1"/>
-    <parameter name="channels" type="string" value="x"/>
-  </swizzle>
-  <swizzle name="swizz_y" type="float">
-    <input name="in" type="vector2" nodename="mult1"/>
-    <parameter name="channels" type="string" value="y"/>
-  </swizzle>
-  <floor name="floor1" type="float">
-    <input name="in" type="float" nodename="swizz_x"/>
+  <floor name="floor1" type="vector2">
+    <input name="in" type="vector2" nodename="mult1" />
   </floor>
-  <floor name="floor2" type="float">
-    <input name="in" type="float" nodename="swizz_y"/>
-  </floor>
-  <add name="add1" type="float">
-    <input name="in1" type="float" nodename="floor1"/>
-    <input name="in2" type="float" nodename="floor2"/>
-  </add>
-  <modulo name="mod1" type="float">
-    <input name="in1" type="float" nodename="add1"/>
-    <input name="in2" type="float" value="2.0"/>
+  <dotproduct name="dotproduct1" type="float">
+    <input name="in1" type="vector2" nodename="floor1" />
+    <input name="in2" type="vector2" value="1, 1" />
+  </dotproduct>
+  <modulo name="modulo1" type="float">
+    <input name="in1" type="float" nodename="dotproduct1" />
+    <input name="in2" type="float" value="2" />
   </modulo>
-  <output name="out" type="float" nodename="mod1"/>
+  <output name="out" type="float" nodename="modulo1" />
 </nodegraph>
 ```
 **Figure 4**: Checker node implementation using a nodegraph.
@@ -163,12 +152,11 @@ This is useful for creating a compound for a set of nodes performing some common
 ### 1.3.4 Dynamic Code Generation
 In some situations static source code is not enough to implement a node. The code might need to be customized depending on parameters set on the node. Or for a hardware render target vertex streams or uniform inputs might need to be created in order to supply the data needed for the node implementation.
 
-In this case, a C++ class can be added to handle the implementation of the node. The class should be derived from the base class `ShaderNodeImpl`. It should specify what language and target it is for by overriding `getLanguage()` and `getTarget()`. It can also be specified to support all languages or all targets by setting the identifier to an empty string, as done for the target identifier in the example below. It then needs to be registered for a `ShaderGenerator` by calling `ShaderGenerator::registerImplementation()`. See Figure 5 for an example.
+In this case, a C++ class can be added to handle the implementation of the node. The class should be derived from the base class `ShaderNodeImpl`. It should specify what target it is for by overriding `getTarget()`. It then needs to be registered for a `ShaderGenerator` by calling `ShaderGenerator::registerImplementation()`. See Figure 5 for an example.
 
-When a `ShaderNodeImpl` class is used for a nodedef the corresponding `<implementation>`
-element doesn’t need a file attribute, since no static source code is used. The `<implementation>` element will then act only as a declaration that there exists an implementation for the nodedef for a particular language and target.
+When a `ShaderNodeImpl` class is used for a nodedef the corresponding `<implementation>` element doesn’t need a file attribute, since no static source code is used. The `<implementation>` element will then act only as a declaration that there exists an implementation for the nodedef for a particular target.
 
-Note that by using a `ShaderNodeImpl` class for your node's implementation it is no longer data driven, as in the other three methods above. So it's recommneded to use this only when inline expressions or static source code functions are not enough to handle the implementation of a node.
+Note that by using a `ShaderNodeImpl` class for your node's implementation it is no longer data driven, as in the other three methods above. So it's recommended to use this only when inline expressions or static source code functions are not enough to handle the implementation of a node.
 
 ```c++
 /// Implementation of ’foo' node for OSL
@@ -177,8 +165,7 @@ class FooOsl : public ShaderNodeImpl
   public:
     static ShaderNodeImplPtr create() { return std::make_shared<FooOsl>(); }
 
-    const string& getLanguage() const override { return LANGUAGE_OSL; }
-    const string& getTarget() const override { return EMPTY_STRING; }
+    const string& getTarget() const override { return OslShaderGenerator::TARGET; }
 
     void emitFunctionDefinition(const ShaderNode& node, GenContext& context,
                                 ShaderStage& stage) const override
@@ -293,7 +280,8 @@ class TexCoordGlsl : public ShaderNodeImpl
         const string index = indexInput ? indexInput->getValue()->getValueString() : "0";
         const string variable = "texcoord_" + index;
 
-        BEGIN_SHADER_STAGE(stage, Stage::VERTEX)
+        DEFINE_SHADER_STAGE(stage, Stage::VERTEX)
+        {
             VariableBlock& vertexData = stage.getOutputBlock(HW::VERTEX_DATA);
             const string prefix = vertexData.getInstance() + ".";
             ShaderPort* texcoord = vertexData[variable];
@@ -302,9 +290,10 @@ class TexCoordGlsl : public ShaderNodeImpl
                 shadergen.emitLine(prefix + texcoord->getVariable() + " = i_" + variable, stage);
                 texcoord->setEmitted();
             }
-        END_SHADER_STAGE(shader, Stage::VERTEX)
+        }
 
-        BEGIN_SHADER_STAGE(stage, Stage::PIXEL)
+        DEFINE_SHADER_STAGE(stage, Stage::PIXEL)
+        {
             VariableBlock& vertexData = stage.getInputBlock(HW::VERTEX_DATA);
             const string prefix = vertexData.getInstance() + ".";
             ShaderPort* texcoord = vertexData[variable];
@@ -312,7 +301,7 @@ class TexCoordGlsl : public ShaderNodeImpl
             shadergen.emitOutput(node.getOutput(), true, false, context, stage);
             shadergen.emitString(" = " + prefix + texcoord->getVariable(), stage);
             shadergen.emitLineEnd(stage);
-        END_SHADER_STAGE(shader, Stage::PIXEL)
+        }
     }
 };
 ```
@@ -359,9 +348,9 @@ Uniform variables
 | u_viewDirection                     | vec3    | World-space direction of the viewer. |
 | u_frame                             | float   | The current frame number as defined by the host application. |
 | u_time                              | float   | The current time in seconds. |
-| u_geomprop_\<name>                   | \<type> | A named property of given \<type> where \<name> is the name of the variable on the geometry. |
+| u_geomprop_\<name>                  | \<type> | A named property of given \<type> where \<name> is the name of the variable on the geometry. |
 | u_numActiveLightSources             | int     | The number of currently active light sources. Note that in shader this is clamped against the maximum allowed number of light sources. |
 | u_lightData[]                       | struct  | Array of struct LightData holding parameters for active light sources. The `LightData` struct is built dynamically depending on requirements for bound light shaders. |
-| u_\<unitType>UnitTarget[]            | integer  | An attribute indicating the target unit for a given unit type definition (\<unitType>). |
+| u_\<unitType>UnitTarget[]           | integer  | An attribute indicating the target unit for a given unit type definition (\<unitType>). |
 
 **Figure 7** : Listing of predefined variables with their binding rules.

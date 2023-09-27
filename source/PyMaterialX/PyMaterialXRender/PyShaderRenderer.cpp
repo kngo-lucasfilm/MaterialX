@@ -1,6 +1,6 @@
 //
-// TM & (c) 2019 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #include <PyMaterialX/PyMaterialX.h>
@@ -13,7 +13,7 @@ namespace mx = MaterialX;
 void bindPyShaderRenderer(py::module& mod)
 {
     py::class_<mx::ShaderRenderer, mx::ShaderRendererPtr>(mod, "ShaderRenderer")
-        .def("initialize", &mx::ShaderRenderer::initialize)
+        .def("initialize", &mx::ShaderRenderer::initialize, py::arg("renderContextHandle") = nullptr)
         .def("setCamera", &mx::ShaderRenderer::setCamera)
         .def("getCamera", &mx::ShaderRenderer::getCamera)
         .def("setImageHandler", &mx::ShaderRenderer::setImageHandler)
@@ -25,6 +25,7 @@ void bindPyShaderRenderer(py::module& mod)
         .def("createProgram", static_cast<void (mx::ShaderRenderer::*)(mx::ShaderPtr)>(&mx::ShaderRenderer::createProgram))
         .def("createProgram", static_cast<void (mx::ShaderRenderer::*)(const mx::ShaderRenderer::StageMap&)>(&mx::ShaderRenderer::createProgram))
         .def("validateInputs", &mx::ShaderRenderer::validateInputs)
+        .def("updateUniform", &mx::ShaderRenderer::updateUniform)
         .def("setSize", &mx::ShaderRenderer::setSize)
         .def("render", &mx::ShaderRenderer::render);
 

@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #ifndef MATERIALX_IMAGEHANDLER_H
@@ -48,6 +48,8 @@ class MX_RENDER_API ImageSamplingProperties
     /// @param uniformBlock Block containing sampler uniforms
     void setProperties(const string& fileNameUniform,
                        const VariableBlock& uniformBlock);
+    
+    bool operator==(const ImageSamplingProperties& r) const;
 
     /// Address mode options. Matches enumerations allowed for image address
     /// modes, except UNSPECIFIED which indicates no explicit mode was defined.
@@ -84,6 +86,20 @@ class MX_RENDER_API ImageSamplingProperties
     /// Default color. Corresponds to the "default" value on the image
     /// node definition.
     Color4 defaultColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+};
+
+/// @struct ImageSamplingKeyHasher
+/// Class used for hashing ImageSamplingProperties in an unordered_map
+struct MX_RENDER_API ImageSamplingKeyHasher
+{
+    size_t operator()(const ImageSamplingProperties& k) const
+    {
+        return (size_t) k.enableMipmaps                   + // 1 bit
+               (((size_t) k.filterType         & 3) << 1) + // 2 bit
+               ((((size_t) k.uaddressMode + 1) & 7) << 3) + // 3 bit
+               ((((size_t) k.vaddressMode + 1) & 7) << 6) + // 3 bit
+               ((((size_t) k.defaultColor[0] + 1))  << 9) ;
+    }
 };
 
 /// @class ImageLoader
@@ -170,9 +186,12 @@ class MX_RENDER_API ImageHandler
 
     /// Acquire an image from the cache or file system.  If the image is not
     /// found in the cache, then each image loader will be applied in turn.
+    /// If the image cannot be found by any loader, then a uniform image of the
+    /// given default color will be returned.
     /// @param filePath File path of the image.
+    /// @param defaultColor Default color to use as a fallback for missing images.
     /// @return On success, a shared pointer to the acquired image.
-    ImagePtr acquireImage(const FilePath& filePath);
+    ImagePtr acquireImage(const FilePath& filePath, const Color4& defaultColor = Color4(0.0f));
 
     /// Bind an image for rendering.
     /// @param image The image to bind.
@@ -231,16 +250,9 @@ class MX_RENDER_API ImageHandler
         return _zeroImage;
     }
 
-    /// Return the sentinel invalid image, representing images that cannot be loaded
-    /// and should be replaced with their declared default value.
-    ImagePtr getInvalidImage() const
-    {
-        return _invalidImage;
-    }
-
     /// Acquire all images referenced by the given document, and return the
     /// images in a vector.
-    ImageVec getReferencedImages(DocumentPtr doc);
+    ImageVec getReferencedImages(ConstDocumentPtr doc);
 
   protected:
     // Protected constructor.
@@ -262,7 +274,6 @@ class MX_RENDER_API ImageHandler
     FileSearchPath _searchPath;
     StringResolverPtr _resolver;
     ImagePtr _zeroImage;
-    ImagePtr _invalidImage;
 };
 
 MATERIALX_NAMESPACE_END

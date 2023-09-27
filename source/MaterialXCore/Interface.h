@@ -1,6 +1,6 @@
 //
-// TM & (c) 2017 Lucasfilm Entertainment Company Ltd. and Lucasfilm Ltd.
-// All rights reserved.  See LICENSE.txt for license.
+// Copyright Contributors to the MaterialX Project
+// SPDX-License-Identifier: Apache-2.0
 //
 
 #ifndef MATERIALX_INTERFACE_H
@@ -61,6 +61,7 @@ class MX_CORE_API PortElement : public ValueElement
 
   protected:
     using NodePtr = shared_ptr<Node>;
+    using ConstNodePtr = shared_ptr<const Node>;
 
   public:
     /// @name Node Name
@@ -174,7 +175,7 @@ class MX_CORE_API PortElement : public ValueElement
     /// Set the node to which this element is connected.  The given node must
     /// belong to the same node graph.  If the node argument is null, then
     /// any existing node connection will be cleared.
-    void setConnectedNode(NodePtr node);
+    void setConnectedNode(ConstNodePtr node);
 
     /// Return the node, if any, to which this element is connected.
     virtual NodePtr getConnectedNode() const;
@@ -634,9 +635,12 @@ class MX_CORE_API InterfaceElement : public TypedElement
     ///    by the given target name.
     /// @param target An optional target name, which will be used to filter
     ///    the declarations that are considered.
-    /// @return A shared pointer to nodedef, or an empty shared pointer if
+    /// @return A shared pointer to declaration, or an empty shared pointer if
     ///    no declaration was found.
-    virtual ConstNodeDefPtr getDeclaration(const string& target = EMPTY_STRING) const;
+    virtual ConstInterfaceElementPtr getDeclaration(const string& target = EMPTY_STRING) const;
+
+    /// Clear all attributes and descendants from this element.
+    void clearContent() override;
 
     /// Return true if this instance has an exact input match with the given
     /// declaration, where each input of this the instance corresponds to a

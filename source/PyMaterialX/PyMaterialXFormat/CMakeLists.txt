@@ -13,8 +13,7 @@ set_target_properties(
     OUTPUT_NAME PyMaterialXFormat
     COMPILE_FLAGS "${EXTERNAL_COMPILE_FLAGS}"
     LINK_FLAGS "${EXTERNAL_LINK_FLAGS}"
-    VERSION "${MATERIALX_LIBRARY_VERSION}"
-    SOVERSION "${MATERIALX_MAJOR_VERSION}"
+    INSTALL_RPATH "${MATERIALX_UP_TWO_RPATH}"
     DEBUG_POSTFIX "${MATERIALX_PYTHON_DEBUG_POSTFIX}")
 
 target_link_libraries(
@@ -24,4 +23,4 @@ target_link_libraries(
     PRIVATE ${CMAKE_DL_LIBS})
 
 install(TARGETS PyMaterialXFormat
-        DESTINATION "python/MaterialX")
+        DESTINATION "${MATERIALX_PYTHON_FOLDER_NAME}")
